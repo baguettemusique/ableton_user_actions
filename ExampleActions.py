@@ -196,7 +196,6 @@ class ExampleActions(UserActionsBase):
         self.add_track_action('switch_loop_source', self.switch_play_from_audiotrack_to_simplertrack)
         self.add_track_action('get_track_index', self.get_track_index)
         self.add_global_action('get_track_number', self.get_track_number)
-      #   self.add_clip_action('bpm_from_loop', self.set_new_bpm_simpler)
       
     def get_track_number(self, action_def, _):
         """ prints track number in the song """
@@ -236,8 +235,6 @@ class ExampleActions(UserActionsBase):
         changes track name to SIMPLER X, sets playmode to classic, sets utility gain to match initial loop,
          sets track color and adds a midi clip filled with C3 for the simpler to be ready to play"""
         track = action_def['track']   
-      #   self.canonical_parent.show_message('ya qqun %s' % args)
-      #   target_length = float(args)/4 
         initial_nb_tracks = 5 # VERY IMPORTANT PARAMETER
         actual_nb_tracks = len(list(self.song().tracks))
         new_simpler_index = actual_nb_tracks - initial_nb_tracks
@@ -257,8 +254,6 @@ class ExampleActions(UserActionsBase):
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ADDCLIP 1 %.3f' % sample_length_bar_unit)
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/user_clip(1) fill_with_do')
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV("Utility") "Gain" 80') #sets gain to 9 dB
-            #   self.canonical_parent.show_message('%s' % track.simplerdevice)
-            #   self.canonical_parent.show_message('%s' % list(track.devices)[0].sample.end_marker) # need to convert it to seconds...)
               self.canonical_parent.show_message('%.7f' % sample_length_bar_unit) 
         else:
               self.canonical_parent.show_message('No track object')
@@ -269,7 +264,7 @@ class ExampleActions(UserActionsBase):
         clip = action_def['clip']   
         self.canonical_parent.show_message('ya qqun %s' % args)
         if clip:
-             #  -----  get current bpm and calculate target bpm 
+             #  --------------  get current bpm and calculate target bpm -----------------
               length_init = clip.length
               length_target = float(args)  
               tempo_init = self.song().tempo
@@ -277,15 +272,23 @@ class ExampleActions(UserActionsBase):
               self.canonical_parent.show_message('ancient BPM %s new BPM %s' % (tempo_init, tempo_target)) 
               self.canonical_parent.clyphx_pro_component.trigger_action_list('BPM %s' % tempo_target )
               ratio_length_generic = length_target/length_init # can be used for all simplers
-              new_length_generic = clip.length*ratio_length_generic
-              if tempo_init < tempo_target:
-                  self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/STOP ; SEL/CLIP(1) LOOP END %.2f' % new_length_generic) 
-                  self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/CLIP(1) NOTES EXP ; SEL/PLAY 1')  
-                  # self.canonical_parent.show_message('notes ') 
-              elif tempo_init > tempo_target:
-                   self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/STOP ; SEL/CLIP(1) LOOP END %.2f' % new_length_generic) 
-                   self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/PLAY 1')
-                        
+              # -------------------- prepare loop for all simplers ---------------
+              initial_nb_tracks = 5 # VERY IMPORTANT PARAMETER
+              actual_nb_tracks = len(list(self.song().tracks))
+              nb_of_simplers_present = actual_nb_tracks - initial_nb_tracks
+              for i in range(1,nb_of_simplers_present+1):
+                    cliplength_init = list(self.song().tracks)[i].clip_slots[0].clip.length
+                    cliplength_target = cliplength_init*ratio_length_generic
+                    idx_track = int(i+1)
+                    self.canonical_parent.show_message('Last TR: %s, last length: %s' % (i+1,cliplength_target)) 
+                    if tempo_init < tempo_target:
+                        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP ; %s/CLIP(1) LOOP END %.2f' % (idx_track,idx_track,cliplength_target)) 
+                        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) NOTES EXP ; %s/PLAY 1' % (idx_track,idx_track))  
+                        self.canonical_parent.show_message('Last TR: %s, last length: %s' % (i,cliplength_target)) 
+                    if tempo_init > tempo_target:
+                        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP ; %s/CLIP(1) LOOP END %.2f' % (idx_track,idx_track,cliplength_target)) 
+                        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PLAY 1' % idx_track)
+                        self.canonical_parent.show_message('Last TR: %s, last length: %s' % (i,cliplength_target)) 
         else:
             self.canonical_parent.show_message('No clip object')
         
@@ -297,7 +300,6 @@ class ExampleActions(UserActionsBase):
         self.canonical_parent.show_message('ya qqun %s' % args)
         if clip:
               # ------- send clip to simpler with a 12 dB utility device
-            #   clip.warping = False # not a super idea actually
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/CLIP(SEL) TOSIMP')
         else:
             self.canonical_parent.show_message('No clip object')
