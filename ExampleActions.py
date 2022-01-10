@@ -162,7 +162,9 @@ ________________________________________________________________________________
 
 # Import UserActionsBase to extend it.
 from ClyphX_Pro.clyphx_pro.UserActionsBase import UserActionsBase
+# import numpy as np
 # import Live
+import time
 
 
 # Your class must extend UserActionsBase.
@@ -196,13 +198,69 @@ class ExampleActions(UserActionsBase):
         self.add_track_action('switch_loop_source', self.switch_play_from_audiotrack_to_simplertrack)
         self.add_track_action('get_track_index', self.get_track_index)
         self.add_global_action('get_track_number', self.get_track_number)
+        self.add_global_action('count_playing_clips', self.count_playing_clips)
+        self.add_track_action('play_from_last', self.play_counting_from_last_clip)
+        self.add_track_action('set_simpler_slice', self.set_simpler_slice)
+        self.add_track_action('plugin_preset_change', self.increment_plugin_preset)
+
+
+    def increment_plugin_preset(self, action_def, args):
+        """increment plugin preset index in program list"""
+        track = action_def['track']   
+        track_idx = list(self.song().tracks).index(action_def['track']) 
+        if track.devices[0].selected_preset_index >= 4:
+              track.devices[0].selected_preset_index = 0
+        else:
+              track.devices[0].selected_preset_index += 1 
+    
+    def set_simpler_slice(self, action_def, args):
+        """set simpler in slice mode right after being created, split into 1 beat clip"""
+        track = action_def['track']   
+        track_idx = list(self.song().tracks).index(action_def['track']) 
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ARM ON ; SEL/INSUB "Ch. 16"')
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV(1) SIMP PLAYMODE 3 ; SEL/DEV(1) SIMP WARP ON ; SEL/DEV(1) SIMP GATE OFF') #mode 3 = slice
+        simpler=track.devices[0]
+        simpler.sample.slicing_style = 1 # slice by beat
+        simpler.sample.slicing_beat_division = int(args) # test
+        simpler.sample.gain = 0.6 # => 8 db
       
+        
+    def play_counting_from_last_clip(self, action_def, args):
+        """ plays the clip in position LAST-args of the selected track """
+        track = action_def['track']   
+        clipslots=list(track.clip_slots)
+        nb_clipslots_full = 0
+      #   self.canonical_parent.show_message('clipslots coucou')
+        for i in range(0,len(clipslots)):
+            #   self.canonical_parent.show_message('args int %s' % int(args))
+              if track.clip_slots[i].has_clip:
+                    nb_clipslots_full+=1
+        idx_final=nb_clipslots_full-int(args)
+        self.canonical_parent.show_message('idx final %s' % idx_final)
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/PLAY %s' % idx_final)
+
+      #   if track:
+      #       #   self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/PLAY %s' % idx_toplay)
+      #   else:
+      #       self.canonical_parent.show_message('No track object')
+    
+    def count_playing_clips(self, action_def, _):
+        """ prints list of playing clips """
+        bool_play=list()
+        for i in range(0,len(list(self.song().tracks))):
+              clip_slot = list(self.song().tracks)[i].clip_slots[0]
+              if clip_slot.has_clip:
+                    isplaying = clip_slot.clip.is_playing
+              else:
+                    isplaying = False
+              bool_play.append(isplaying)
+        self.canonical_parent.show_message('%s' % bool_play)
+    
     def get_track_number(self, action_def, _):
         """ prints track number in the song """
         self.canonical_parent.show_message('ya qqun ')
         track_nb = len(list(self.song().tracks))
         self.canonical_parent.show_message('nb tracks : %s' % track_nb)
-      #   return track_nb
               
     def get_track_index(self, action_def, _):
         """ prints track index """
@@ -281,14 +339,16 @@ class ExampleActions(UserActionsBase):
                     cliplength_target = cliplength_init*ratio_length_generic
                     idx_track = int(i+1)
                     self.canonical_parent.show_message('Last TR: %s, last length: %s' % (i+1,cliplength_target)) 
-                    if tempo_init < tempo_target:
+                    isplaying = list(self.song().tracks)[i].clip_slots[0].clip.is_playing
+                    if isplaying:
                         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP ; %s/CLIP(1) LOOP END %.2f' % (idx_track,idx_track,cliplength_target)) 
-                        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) NOTES EXP ; %s/PLAY 1' % (idx_track,idx_track))  
-                        self.canonical_parent.show_message('Last TR: %s, last length: %s' % (i,cliplength_target)) 
-                    if tempo_init > tempo_target:
-                        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP ; %s/CLIP(1) LOOP END %.2f' % (idx_track,idx_track,cliplength_target)) 
+                        if tempo_init < tempo_target:
+                              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) NOTES EXP' % idx_track)  
                         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PLAY 1' % idx_track)
-                        self.canonical_parent.show_message('Last TR: %s, last length: %s' % (i,cliplength_target)) 
+                    else:
+                        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP ; %s/CLIP(1) LOOP END %.2f' % (idx_track,idx_track,cliplength_target)) 
+                        if tempo_init < tempo_target:
+                              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) NOTES EXP' % idx_track)  
         else:
             self.canonical_parent.show_message('No clip object')
         
