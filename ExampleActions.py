@@ -202,7 +202,70 @@ class ExampleActions(UserActionsBase):
         self.add_track_action('play_from_last', self.play_counting_from_last_clip)
         self.add_track_action('set_simpler_slice', self.set_simpler_slice)
         self.add_track_action('plugin_preset_change', self.increment_plugin_preset)
+        self.add_global_action('set_binklooper_beats', self.set_binklooper_beats)
+        self.add_global_action('inc_binklooper_beats', self.increase_binklooper_beats)
+        self.add_global_action('dec_binklooper_beats', self.decrease_binklooper_beats)
+        self.add_global_action('simplers_to_rec', self.simplers_clips_to_rec_clip)
+      #   self.add_track_action('set_simpler_loop_on', self.set_simpler_loop_on)
+      #   self.add_clip_action('send_clip_to_simpler', self.send_audio_clip_to_existing_simpler)
+#  didnt find function to replace simpler sample 
+#     def send_audio_clip_to_existing_simpler(self, action_def, args):
+#         """ like TOSIMP but sending to existing simpler track """
+#         clip = action_def['clip']
+#         if clip:
+#               nb_simpler = args
 
+
+#         else:
+#               self.canonical_parent.show_message('no clip object') 
+
+
+    def simplers_clips_to_rec_clip(self, action_def, _):
+        """ sends all simpler playing clips to an audio rec clip on 1st REC track. if pressed again, launches the rec clip """
+        all_tracks=list(self.song().tracks)
+        track_rec=all_tracks[0]
+        index_simplers = [i for i in range(len(all_tracks)) if "Simpler" in all_tracks[i].name]
+        rec_clipslots=list(track_rec.clip_slots)
+        rec_clipslots_empty = [i for i in range(len(rec_clipslots)) if not rec_clipslots[i].has_clip]
+      #   CONDITION : we want to play press to the rec clip whether it is already recording (existing) or not existing yet 
+        index_first_empty_slot = rec_clipslots_empty[0]
+        self.canonical_parent.show_message('target slot : %s, new clip : %s' % (index_first_empty_slot+1, not rec_clipslots[index_first_empty_slot-1].is_playing) )
+        if not rec_clipslots[index_first_empty_slot-1].is_playing:
+              for i in range(len(index_simplers)):
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/OUT "%s"' % (int(index_simplers[i]+1), all_tracks[0].name)) 
+            # create new clip 
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('1/PLAY %s' % int(index_first_empty_slot+1)) 
+        else:
+            # launch the previously created clip
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('1/PLAY %s' % index_first_empty_slot) 
+            #  stop simpler tracks so that only the rec track remains, reset simplers outputs to Master
+              for i in range(len(index_simplers)):
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP' % int(index_simplers[i]+1))
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/OUT "Master"' % int(index_simplers[i]+1))      
+
+    def decrease_binklooper_beats(self, action_def, _):
+        """ decreases by 1 the beat numbers of binklooper in 1st track, changes its name to display new beat nb """
+        track_bink=list(self.song().tracks)[0]
+        param_bink=list(track_bink.devices)[0].parameters
+        self.canonical_parent.show_message('beats %s' % type(param_bink[5].value)) #param[5] is loop length
+        param_bink[5].value -= 1
+        list(track_bink.clip_slots)[-1].clip.name = "Bink %d" % param_bink[5].value
+        
+    def increase_binklooper_beats(self, action_def, _):
+        """ increases by 1 the beat numbers of binklooper in 1st track, changes its name to display new beat nb """
+        track_bink=list(self.song().tracks)[0]
+        param_bink=list(track_bink.devices)[0].parameters
+        self.canonical_parent.show_message('beats %s' % type(param_bink[5].value)) #param[5] is loop length
+        param_bink[5].value += 1
+        list(track_bink.clip_slots)[-1].clip.name = "Bink %d" % param_bink[5].value 
+
+    def set_binklooper_beats(self, action_def, args):
+        """ sets beat numbers of binklooper in 1st track, changes its name to display new beat nb """
+        track_bink=list(self.song().tracks)[0]
+        param_bink=list(track_bink.devices)[0].parameters
+        self.canonical_parent.show_message('beats %s' % type(param_bink[5].value)) #param[5] is loop length
+        param_bink[5].value = int(args)
+        list(track_bink.clip_slots)[-1].clip.name = "Bink %d" % int(args) 
 
     def increment_plugin_preset(self, action_def, args):
         """increment plugin preset index in program list"""
@@ -227,22 +290,13 @@ class ExampleActions(UserActionsBase):
         
     def play_counting_from_last_clip(self, action_def, args):
         """ plays the clip in position LAST-args of the selected track """
-        track = action_def['track']   
+        track = action_def['track']    
         clipslots=list(track.clip_slots)
-        nb_clipslots_full = 0
-      #   self.canonical_parent.show_message('clipslots coucou')
-        for i in range(0,len(clipslots)):
-            #   self.canonical_parent.show_message('args int %s' % int(args))
-              if track.clip_slots[i].has_clip:
-                    nb_clipslots_full+=1
-        idx_final=nb_clipslots_full-int(args)
+      #   list of indexes of clipslots where a clip is present 
+        list_index_full = [i for i in range(len(clipslots)) if track.clip_slots[i].has_clip == True]
+        idx_final = list_index_full[-1]-int(args)+1
         self.canonical_parent.show_message('idx final %s' % idx_final)
         self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/PLAY %s' % idx_final)
-
-      #   if track:
-      #       #   self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/PLAY %s' % idx_toplay)
-      #   else:
-      #       self.canonical_parent.show_message('No track object')
     
     def count_playing_clips(self, action_def, _):
         """ prints list of playing clips """
@@ -276,16 +330,23 @@ class ExampleActions(UserActionsBase):
     def switch_play_from_audiotrack_to_simplertrack(self, action_def, _):
         """ stops audio clip from audio track and launches clip in simpler track """
         track = action_def['track'] 
-      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('1/STOP')
-      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/PLAY 1')
-      #   self.sample.gain=12
-      #   self.canonical_parent.show_message('gain : %s' % self.sample.gain)
         if track:
               self.canonical_parent.clyphx_pro_component.trigger_action_list('1/STOP')
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/PLAY 1')
               self.canonical_parent.show_message('sample : %s' % action_def)
         else:
               self.canonical_parent.show_message('No track object')
+
+
+#     def set_simpler_loop_on(self, action_def, _):
+#         """ Right after creating simple track : resize midi simpler clip length, 
+#         changes track name to SIMPLER X, sets playmode to classic, sets utility gain to match initial loop,
+#          sets track color and adds a midi clip filled with C3 for the simpler to be ready to play"""
+#         track = action_def['track']   
+#         self.canonical_parent.show_message('%s' % list(track.devices)[0].playback_mode)
+#       #   retrig = list(track.devices)[0].sample.retrigger
+        
+        
 
 
     def set_simpler_track_free_performance(self, action_def, _):
@@ -307,11 +368,13 @@ class ExampleActions(UserActionsBase):
         sample_length_bar_unit = sample_length_beat_unit/4
         if track:
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/NAME "Simpler %s"' % new_simpler_index)
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV SIMP PLAYMODE CLASSIC')
+              sample_length_frame_unit = list(track.devices)[0].playback_mode = 0
+            #   self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV SIMP PLAYMODE CLASSIC')
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/Color %s' % track_color)
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ADDCLIP 1 %.3f' % sample_length_bar_unit)
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/user_clip(1) fill_with_do')
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV("Utility") "Gain" 80') #sets gain to 9 dB
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV("BINK looper") DEL')
               self.canonical_parent.show_message('%.7f' % sample_length_bar_unit) 
         else:
               self.canonical_parent.show_message('No track object')
@@ -326,10 +389,16 @@ class ExampleActions(UserActionsBase):
               length_init = clip.length
               length_target = float(args)  
               tempo_init = self.song().tempo
-              tempo_target = tempo_init*length_target/length_init
+              odd_measures = [3,5,6,7,9,10,11] #List of args that will take into account time sig change
+              if length_target in odd_measures:
+                    time_sig_factor = 4/length_target
+              else:
+                    time_sig_factor = 1              
+              tempo_target = tempo_init*length_target/length_init*time_sig_factor
+              time_sig_target = int(args)
               self.canonical_parent.show_message('ancient BPM %s new BPM %s' % (tempo_init, tempo_target)) 
               self.canonical_parent.clyphx_pro_component.trigger_action_list('BPM %s' % tempo_target )
-              ratio_length_generic = length_target/length_init # can be used for all simplers
+              ratio_length_generic = length_target/length_init*time_sig_factor # can be used for all simplers
               # -------------------- prepare loop for all simplers ---------------
               initial_nb_tracks = 5 # VERY IMPORTANT PARAMETER
               actual_nb_tracks = len(list(self.song().tracks))
