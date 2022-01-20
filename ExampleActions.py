@@ -206,6 +206,10 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('inc_binklooper_beats', self.increase_binklooper_beats)
         self.add_global_action('dec_binklooper_beats', self.decrease_binklooper_beats)
         self.add_global_action('simplers_to_rec', self.simplers_clips_to_rec_clip)
+        self.add_global_action('navigate_tracks', self.navigate_in_music_tracks)
+        self.add_global_action('navigate_clips', self.navigate_in_music_clips)
+        self.add_global_action('del_simplers', self.delete_all_simpler_tracks)
+        self.add_track_action('send_beat_to_main_scene', self.select_beat_and_paste_to_main_scene)
       #   self.add_track_action('set_simpler_loop_on', self.set_simpler_loop_on)
       #   self.add_clip_action('send_clip_to_simpler', self.send_audio_clip_to_existing_simpler)
 #  didnt find function to replace simpler sample 
@@ -219,6 +223,78 @@ class ExampleActions(UserActionsBase):
 #         else:
 #               self.canonical_parent.show_message('no clip object') 
 
+
+    def select_beat_and_paste_to_main_scene(self, action_def, _):
+        """ sends selected beat in beat track to scene 1 """
+        track=action_def['track']
+        bool1=bool("Beats" in track.name)
+        self.canonical_parent.show_message('bool1 %s' % bool1 )
+        if "Beats" in track.name:
+              self.canonical_parent.show_message('beat track true ' )
+              clipslots = list(track.clip_slots)
+              idx_clip_selected = clipslots.index(self.song().view.highlighted_clip_slot)
+              idx_clipslots_full = [i for i in range(len(clipslots)) if clipslots[i].has_clip]
+              if idx_clip_selected in idx_clipslots_full:
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/COPYCLIP SEL ; SEL/PASTECLIP 1') 
+            
+
+
+    def delete_all_simpler_tracks(self, action_def, _):
+        """ Deletes all Simpler tracks """
+        tracks=list(self.song().tracks)
+        string_music_track_names="Simpler"
+        idx_simpler_tracks = [i for i in range(len(tracks)) if string_music_track_names in tracks[i].name]
+        for i in range(len(idx_simpler_tracks)):
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/DEL' % int(idx_simpler_tracks[i]+1)) 
+
+
+    def navigate_in_music_clips(self, action_def, _):
+        """ selects next clip in selected track if sel track is music track. other wise selects Rec track 1st clip """
+        tracks=list(self.song().tracks)
+        string_music_track_names=["test","Rec","Beats","Bass"] # strings that will make a track considered as "music track"
+        idx_music_tracks = []
+        sel_track = self.song().view.selected_track
+        idx_sel_track = tracks.index(sel_track)
+        clipslots = list(sel_track.clip_slots)
+        idx_clip_selected = clipslots.index(self.song().view.highlighted_clip_slot)
+        idx_clipslots_full = [i for i in range(len(clipslots)) if clipslots[i].has_clip]
+        # -------------- get indexes of music tracks ------------------
+        for i in range(len(string_music_track_names)):
+              idx_goodname = [item for item in range(len(tracks)) if string_music_track_names[i] in tracks[item].name]
+              idx_music_tracks.extend(idx_goodname)
+        idx_music_tracks.sort()
+      #   # -------------- if music trck selected, select next clip. else, go back to Rec track, clip 1 ------------------
+        if idx_sel_track in idx_music_tracks:
+              # -------------- if last full clipslot selected, or empty slot selected, go back to 1st slot ---------
+              if idx_clip_selected in idx_clipslots_full and idx_clip_selected is not idx_clipslots_full[-1]:
+                    idx_clip_tosel=idx_clipslots_full[idx_clipslots_full.index(idx_clip_selected)+1]
+              else:
+                    idx_clip_tosel=idx_clipslots_full[0]
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/SEL %s' % int(idx_clip_tosel+1)) 
+        else:
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('1/SEL 1') 
+
+
+    def navigate_in_music_tracks(self, action_def, _):
+        """ selects next track among Simpler tracks, Rec track, Beat track, Bass track, Slice track """
+        tracks=list(self.song().tracks)
+        string_music_track_names=["Simpler","test","Rec","Beats","Slice","Bass","piano"] # strings that will make a track considered as "music track"
+        idx_music_tracks = []
+        sel_track = self.song().view.selected_track
+        idx_sel_track = tracks.index(sel_track)
+        # -------------- get indexes of music tracks ------------------
+        for i in range(len(string_music_track_names)):
+              idx_goodname = [item for item in range(len(tracks)) if string_music_track_names[i] in tracks[item].name]
+              idx_music_tracks.extend(idx_goodname)
+        idx_music_tracks.sort()
+        for i in range(len(idx_music_tracks)):
+              if idx_sel_track in idx_music_tracks and idx_sel_track is not idx_music_tracks[-1]: # if last track selected, go back to 1st track
+                    new_sel_idx = idx_music_tracks[idx_music_tracks.index(idx_sel_track) + 1]
+              else:
+                    new_sel_idx = idx_music_tracks[0]
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/SEL' % int(new_sel_idx+1)) 
+        self.canonical_parent.show_message('new_sel_idx %s' % int(new_sel_idx+1))
+                
 
     def simplers_clips_to_rec_clip(self, action_def, _):
         """ sends all simpler playing clips to an audio rec clip on 1st REC track. if pressed again, launches the rec clip """
@@ -281,6 +357,7 @@ class ExampleActions(UserActionsBase):
         track = action_def['track']   
         track_idx = list(self.song().tracks).index(action_def['track']) 
         self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ARM ON ; SEL/INSUB "Ch. 16"')
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/NAME "Slice"')
         self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV(1) SIMP PLAYMODE 3 ; SEL/DEV(1) SIMP WARP ON ; SEL/DEV(1) SIMP GATE OFF') #mode 3 = slice
         simpler=track.devices[0]
         simpler.sample.slicing_style = 1 # slice by beat
@@ -368,8 +445,8 @@ class ExampleActions(UserActionsBase):
         sample_length_bar_unit = sample_length_beat_unit/4
         if track:
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/NAME "Simpler %s"' % new_simpler_index)
-              sample_length_frame_unit = list(track.devices)[0].playback_mode = 0
-            #   self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV SIMP PLAYMODE CLASSIC')
+              sample_length_frame_unit = list(track.devices)[0].playback_mode = 0 # classic mode
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV(1) B1 P1 48') #Set attack to around 15 ms to avoid clip
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/Color %s' % track_color)
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ADDCLIP 1 %.3f' % sample_length_bar_unit)
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/user_clip(1) fill_with_do')
