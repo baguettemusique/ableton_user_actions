@@ -210,6 +210,9 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('navigate_clips', self.navigate_in_music_clips)
         self.add_global_action('del_simplers', self.delete_all_simpler_tracks)
         self.add_track_action('send_beat_to_main_scene', self.select_beat_and_paste_to_main_scene)
+        self.add_track_action('play_or_stop', self.play_or_stop_first_clip)
+        self.add_global_action('inc_bpm_from_loop', self.increase_bpm_from_loop_arg)
+        self.add_global_action('dec_bpm_from_loop', self.decrease_bpm_from_loop_arg)
       #   self.add_track_action('set_simpler_loop_on', self.set_simpler_loop_on)
       #   self.add_clip_action('send_clip_to_simpler', self.send_audio_clip_to_existing_simpler)
 #  didnt find function to replace simpler sample 
@@ -222,6 +225,54 @@ class ExampleActions(UserActionsBase):
 
 #         else:
 #               self.canonical_parent.show_message('no clip object') 
+
+    def decrease_bpm_from_loop_arg(self, action_def, _):
+        """ decreases by 1 the beat numbers of bpm_from_loop argument """
+        tracks=list(self.song().tracks)
+        idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0] 
+        init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
+        base_name="[] SEL/user_clip(1) bpm_from_loop " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
+        length_arg=len(init_clip_name)-len(base_name)
+        init_bpm_arg = int(init_clip_name[-length_arg:])
+        if init_bpm_arg > 1:
+              new_bpm_arg = init_bpm_arg-1
+        else:
+              new_bpm_arg = 1
+        self.canonical_parent.show_message('new arg %s' % new_bpm_arg) 
+        list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + str(new_bpm_arg)
+    
+    def increase_bpm_from_loop_arg(self, action_def, _):
+        """ increases by 1 the beat numbers of bpm_from_loop argument """
+        tracks=list(self.song().tracks)
+        idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0] 
+        self.canonical_parent.show_message('idx beat ctrl trck %s' % idx_bpm_ctrl_track) 
+        init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
+        base_name="[] SEL/user_clip(1) bpm_from_loop " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
+        length_arg=len(init_clip_name)-len(base_name)
+        init_bpm_arg = int(init_clip_name[-length_arg:])
+        if init_bpm_arg < 16:
+              new_bpm_arg = init_bpm_arg+1
+        else:
+              new_bpm_arg=16
+        self.canonical_parent.show_message('new arg %s' % new_bpm_arg) 
+        list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + str(new_bpm_arg)
+
+    def play_or_stop_first_clip(self, action_def, _):
+        """ plays or stops first clip of track, depending on the actual state """
+        track = action_def['track']
+        idx_track = list(self.song().tracks).index(action_def['track'])
+        first_clipslot = list(track.clip_slots)[0]
+        bool1=bool(first_clipslot.has_clip is False)
+        self.canonical_parent.show_message('bool1 : %s ' %  bool1)
+        if first_clipslot.has_clip is False:
+              return
+        else:
+              if first_clipslot.is_playing:
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP' % int(idx_track+1))
+              else:
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PLAY 1' % int(idx_track+1))
+
+        
 
 
     def select_beat_and_paste_to_main_scene(self, action_def, _):
@@ -309,10 +360,12 @@ class ExampleActions(UserActionsBase):
         if not rec_clipslots[index_first_empty_slot-1].is_playing:
               for i in range(len(index_simplers)):
                     self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/OUT "%s"' % (int(index_simplers[i]+1), all_tracks[0].name)) 
-            # create new clip 
+            # set REC track monitor to Auto and create new clip to rec
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('1/MON Auto') 
               self.canonical_parent.clyphx_pro_component.trigger_action_list('1/PLAY %s' % int(index_first_empty_slot+1)) 
         else:
-            # launch the previously created clip
+            # set Rec track monitor to Off and launch the previously created clip
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('1/MON Off') 
               self.canonical_parent.clyphx_pro_component.trigger_action_list('1/PLAY %s' % index_first_empty_slot) 
             #  stop simpler tracks so that only the rec track remains, reset simplers outputs to Master
               for i in range(len(index_simplers)):
