@@ -213,6 +213,9 @@ class ExampleActions(UserActionsBase):
         self.add_track_action('play_or_stop', self.play_or_stop_first_clip)
         self.add_global_action('inc_bpm_from_loop', self.increase_bpm_from_loop_arg)
         self.add_global_action('dec_bpm_from_loop', self.decrease_bpm_from_loop_arg)
+        self.add_global_action('new_loop_audio_track', self.new_loop_audio_track)
+        self.add_global_action('launch_loop_tracks', self.launch_loop_tracks)
+
       #   self.add_track_action('set_simpler_loop_on', self.set_simpler_loop_on)
       #   self.add_clip_action('send_clip_to_simpler', self.send_audio_clip_to_existing_simpler)
 #  didnt find function to replace simpler sample 
@@ -225,6 +228,65 @@ class ExampleActions(UserActionsBase):
 
 #         else:
 #               self.canonical_parent.show_message('no clip object') 
+
+    def new_loop_audio_track(self, action_def, _):
+        """ create loop in audio track, and corresponding midi clip in Measure track """
+        tracks=list(self.song().tracks)
+        idx_measure_track = [i for i in range(len(tracks)) if "Measure" in tracks[i].name][0]
+        idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
+        idx_loop_target = 1
+        bool_found_free_slot = False
+        if idx_loop_target not in idx_loop_tracks :
+              self.canonical_parent.show_message('idx 1 not in idx_loop_tracks') 
+      # #  ---- get index of first empty loop track to fill ----
+        for i in range(len(idx_loop_tracks)):
+              if list(tracks[1+i].clip_slots)[0].has_clip is False : # add 1 to i because track[0] is rec
+                    idx_loop_target = i+1
+                    bool_found_free_slot = True
+                    break
+        if bool_found_free_slot is False:
+              self.canonical_parent.show_message('need to make free slots !!') 
+      # ---- copy and paste audio clip into empty loop track ----
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/COPYCLIP 1')
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PASTECLIP 1' % int(idx_loop_target+1))
+        list(tracks[idx_loop_target].clip_slots)[0].clip.warping = False
+      #  ---- add dummy midi clip to measure track and adjust length  ----
+        measure_clipslot = list(tracks[idx_measure_track].clip_slots)[0]
+        loop_length = list(tracks[0].clip_slots)[0].clip.length # unit : beats
+        if measure_clipslot.has_clip is False:
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('"Measure"/ADDCLIP 1')
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('"Measure"/CLIP(1) LOOP %s' % loop_length)
+      # --- adjust measure clip name according to number of full looper tracks  POSSIBLE WITH JUST launch_loop_tracks ??---
+        idx_loop_full = [i+1 for i in range(len(idx_loop_tracks)) if list(tracks[idx_loop_tracks[i]].clip_slots)[0].has_clip]
+        measure_clip_name_start='[] (LSEQ) '
+        measure_clip_name_end = '/PLAY 1'
+        measure_clip_name_middle = ''
+      #   self.canonical_parent.show_message('idx loop full %s' % idx_loop_full) 
+        for i in range(len(idx_loop_full)):
+              measure_clip_name_middle += str('%s' % int(idx_loop_full[i]+1))
+              if len(idx_loop_full) > 1 and i < range(len(idx_loop_full))[-1]:
+                    measure_clip_name_middle += ','
+        total_measure_clip_name = measure_clip_name_start + measure_clip_name_middle + measure_clip_name_end
+        self.canonical_parent.show_message('idx loop full %s' % idx_loop_full) 
+      #   self.canonical_parent.show_message(total_measure_clip_name) 
+        measure_clipslot.clip.name = total_measure_clip_name
+        
+
+    def launch_loop_tracks(self, action_def, _):
+        """ after having created audio loop clips, launches clips and stops REC clip """
+        tracks=list(self.song().tracks)
+      #   --- get idx of full loop tracks, stop rec track and launches full looper tracks if any  ---
+        idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
+        idx_loop_full = [i+1 for i in range(len(idx_loop_tracks)) if list(tracks[idx_loop_tracks[i]].clip_slots)[0].has_clip]
+        self.canonical_parent.show_message('idx loop full %s' % idx_loop_full) 
+        if len(idx_loop_full) > 0:
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('1/STOP')
+              for i in range(len(idx_loop_full)):
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PLAY 1' % int(idx_loop_full[i]+1))
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('"Measure"/PLAY 1')
+        else:
+              self.canonical_parent.show_message('no full looper track') 
+         
 
     def decrease_bpm_from_loop_arg(self, action_def, _):
         """ decreases by 1 the beat numbers of bpm_from_loop argument """
@@ -415,7 +477,7 @@ class ExampleActions(UserActionsBase):
         simpler=track.devices[0]
         simpler.sample.slicing_style = 1 # slice by beat
         simpler.sample.slicing_beat_division = int(args) # test
-        simpler.sample.gain = 0.6 # => 8 db
+        simpler.sample.gain = 0.6 # => 8 db ?
       
         
     def play_counting_from_last_clip(self, action_def, args):
@@ -503,7 +565,7 @@ class ExampleActions(UserActionsBase):
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/Color %s' % track_color)
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ADDCLIP 1 %.3f' % sample_length_bar_unit)
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/user_clip(1) fill_with_do')
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV("Utility") "Gain" 80') #sets gain to 9 dB
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV("Utility") "Gain" 75') #sets gain to ?? dB
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV("BINK looper") DEL')
               self.canonical_parent.show_message('%.7f' % sample_length_bar_unit) 
         else:
@@ -521,12 +583,15 @@ class ExampleActions(UserActionsBase):
               tempo_init = self.song().tempo
               odd_measures = [3,5,6,7,9,10,11] #List of args that will take into account time sig change
               if length_target in odd_measures:
-                    time_sig_factor = 4/length_target
+                  #   time_sig_factor = 4/length_target # !!!!!!!! CA VA PAS CE FACTEUR !!!!!!!!!
+                    time_sig_factor = 1 
               else:
                     time_sig_factor = 1              
               tempo_target = tempo_init*length_target/length_init*time_sig_factor
-              time_sig_target = int(args)
               self.canonical_parent.show_message('ancient BPM %s new BPM %s' % (tempo_init, tempo_target)) 
+              self.canonical_parent.show_message('sig factor %s ' % time_sig_factor) 
+            #   self.canonical_parent.show_message('BPM target %s ' % tempo_target) 
+
               self.canonical_parent.clyphx_pro_component.trigger_action_list('BPM %s' % tempo_target )
               ratio_length_generic = length_target/length_init*time_sig_factor # can be used for all simplers
               # -------------------- prepare loop for all simplers ---------------
@@ -537,7 +602,7 @@ class ExampleActions(UserActionsBase):
                     cliplength_init = list(self.song().tracks)[i].clip_slots[0].clip.length
                     cliplength_target = cliplength_init*ratio_length_generic
                     idx_track = int(i+1)
-                    self.canonical_parent.show_message('Last TR: %s, last length: %s' % (i+1,cliplength_target)) 
+                  #   self.canonical_parent.show_message('Last TR: %s, last length: %s' % (i+1,cliplength_target)) 
                     isplaying = list(self.song().tracks)[i].clip_slots[0].clip.is_playing
                     if isplaying:
                         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP ; %s/CLIP(1) LOOP END %.2f' % (idx_track,idx_track,cliplength_target)) 
