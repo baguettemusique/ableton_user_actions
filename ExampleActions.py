@@ -180,25 +180,56 @@ class ExampleActions(UserActionsBase):
         self.add_track_action('stop_loop', self.stop_looper_track)
         self.add_global_action('initial_routing', self.reset_initial_routing)
         self.add_global_action('loopers_to_rec', self.route_loopers_into_rec_track)
+        self.add_global_action('reset_session', self.reset_session)
+        self.add_global_action('reset_loopers', self.reset_looper_tracks)
+
+# ---------- INITIALIZING FUNCTION : DEF ALL USEFULL VARIABLES --------------
+    def initialize_variables(self):
+        """
+        0 : tracks list
+        1 : idx loop tracks
+        2 : idx loop tracks full
+        3 : nb loop_tracks 
+        4 : idx measure tracks
+        """
+        tracks=list(self.song().tracks)
+        idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
+        idx_loop_full = [i+1 for i in range(len(idx_loop_tracks)) if list(tracks[idx_loop_tracks[i]].clip_slots)[0].has_clip]
+        nb_loop_tracks = len(idx_loop_tracks)
+        idx_measure_tracks = [i+nb_loop_tracks for i in idx_loop_full] # Assumption of measure tracks after loop tracks
+        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks
+# ----------- END OF INITIALIZING FUNCTION ---------------------
+
+    def reset_looper_tracks(self, action_def, _):
+        """clear loop clips"""
+        tracks, idx_loop_tracks = [self.initialize_variables()[i] for i in (0,1)]
+        for i in range(len(idx_loop_tracks)):
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) DEL' % int(idx_loop_tracks[i]+1) )
 
 
+    def reset_session(self, action_def, _):
+        """No loop, no rec, MON in """
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/CLIP(1) DEL' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('reset_looper_tracks' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('initial_routing' )
 
-    def route_loopers_into_rec_track(self, action_def, arg):
-        """Rec track in : piano, out : master, Monitor IN. Loopers in : piano, out : REC, Monitor off """
+
+    def route_loopers_into_rec_track(self, action_def, _):
+        """Rec track in : piano, out : master, Monitor IN. Loopers in : piano, out : REC, Monitor off, ARM ON on loopers, OFF on Rec """
         tracks=list(self.song().tracks)
         rec_track_name = tracks[0].name
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; 1/MON IN' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; 1/MON IN; 1/ARM OFF' )
         idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
         for i in range(len(idx_loop_tracks)):
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "piano"; %s/OUT "%s"; %s/MON OFF' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),rec_track_name,int(idx_loop_tracks[i]+1)) )
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "piano"; %s/OUT "%s"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),rec_track_name,int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
 
-    def reset_initial_routing(self, action_def, arg):
+    def reset_initial_routing(self, action_def, _):
         """Rec track in : piano, out : master. Same for loopers. Monitor off for all"""
         tracks=list(self.song().tracks)
         idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
         for i in range(len(idx_loop_tracks)):
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "piano"; %s/OUT "Master"; %s/MON OFF' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; WAIT 5; 1/MON OFF' )
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "piano"; %s/OUT "Master"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; WAIT 5; 1/MON OFF; 1/ARM ON' )
 
     def stop_looper_track(self, action_def, arg):
         """stops looper and corresponding measure track """
@@ -211,29 +242,6 @@ class ExampleActions(UserActionsBase):
         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP' % int(idx_track+1))
         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP' % int(idx_measure_track+1))
 
-#     def del_looper_clip(self, action_def, _):
-#         """ del loop clip from selected loop track, """
-      #   """and changes name from Measure clip so that the deleted loop clip stops getting launched from Measure """
-      #   tracks=list(self.song().tracks)
-      #   track = action_def['track']
-      #   idx_track = list(self.song().tracks).index(action_def['track'])
-      #   idx_measure_track = [i for i in range(len(tracks)) if "Measure" in tracks[i].name][0]
-      #   measure_clipslot = list(tracks[idx_measure_track].clip_slots)[0]
-        # --- remove clip ---
-      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) DEL' % int(idx_track+1))
-        # --- change measure name, depending on if there is a "," after looper track number or not ----
-      #   init_name = measure_clipslot.clip.name 
-      #   self.canonical_parent.show_message('coucou2') 
-      #   self.canonical_parent.show_message('%s' % type(idx_track)) 
-      #   if str(int(idx_track+1)) not in init_name:
-      #         self.canonical_parent.show_message('Track NB not in Measure name !') 
-      #   elif init_name[init_name.index(str(idx_track+1))+1] == ",":
-      #         new_name = init_name.split(str(idx_track+1))[0]+init_name.split(str(idx_track+1))[1][1:]
-      #   else:
-      #         new_name = init_name.split(str(idx_track+1))[0]+init_name.split(str(idx_track+1))[1]
-      #   self.canonical_parent.show_message('%s' % new_name) 
-      #   measure_clipslot.clip.name = new_name
-      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('"Measure"/PLAY 1')
 
 
 
