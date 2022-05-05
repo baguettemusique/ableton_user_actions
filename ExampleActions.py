@@ -168,6 +168,7 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('set_binklooper_beats', self.set_binklooper_beats)
         self.add_global_action('inc_binklooper_beats', self.increase_binklooper_beats)
         self.add_global_action('dec_binklooper_beats', self.decrease_binklooper_beats)
+        self.add_global_action('autoset_binklooper_beats', self.autoset_binklooper_beats)
         self.add_global_action('navigate_tracks', self.navigate_in_music_tracks)
         self.add_global_action('navigate_clips', self.navigate_in_music_clips)
         self.add_global_action('del_simplers', self.delete_all_simpler_tracks)
@@ -451,13 +452,29 @@ class ExampleActions(UserActionsBase):
         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/SEL' % int(new_sel_idx+1)) 
         self.canonical_parent.show_message('new_sel_idx %s' % int(new_sel_idx+1))
                 
+      
+    def autoset_binklooper_beats(self, action_def, _):
+        """ autosets the beat numbers of binklooper in 1st track according to parameter of bpmfromloop function """
+        tracks=list(self.song().tracks)
+        track_bink=list(self.song().tracks)[0]
+        param_bink=list(track_bink.devices)[0].parameters
+        idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0] 
+        self.canonical_parent.show_message('kikou' )
+        init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
+        list_bpm_arg=init_clip_name.split(' ')
+        beat_arg=int(list_bpm_arg[-2])
+        meas_arg=int(list_bpm_arg[-1])
+        self.canonical_parent.show_message('beats %s' % type(param_bink[5].value)) #param[5] is loop length
+        param_bink[5].value = beat_arg*meas_arg
+        list(track_bink.clip_slots)[-1].clip.name = "Bink %d" % param_bink[5].value
+        
 
     def decrease_binklooper_beats(self, action_def, _):
         """ decreases by 1 the beat numbers of binklooper in 1st track, changes its name to display new beat nb """
         track_bink=list(self.song().tracks)[0]
         param_bink=list(track_bink.devices)[0].parameters
         self.canonical_parent.show_message('beats %s' % type(param_bink[5].value)) #param[5] is loop length
-        param_bink[5].value -= 1
+        param_bink[5].value = min(1,param_bink[5].value-1)
         list(track_bink.clip_slots)[-1].clip.name = "Bink %d" % param_bink[5].value
         
     def increase_binklooper_beats(self, action_def, _):
