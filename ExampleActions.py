@@ -173,8 +173,8 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('del_simplers', self.delete_all_simpler_tracks)
         self.add_track_action('send_beat_to_main_scene', self.select_beat_and_paste_to_main_scene)
         self.add_track_action('play_or_stop', self.play_or_stop_first_clip)
-        self.add_global_action('inc_bpm_from_loop', self.increase_bpm_from_loop_arg)
-        self.add_global_action('dec_bpm_from_loop', self.decrease_bpm_from_loop_arg)
+        self.add_global_action('inc_bpm_from_loop_arg', self.increase_bpm_from_loop_arg)
+        self.add_global_action('dec_bpm_from_loop_arg', self.decrease_bpm_from_loop_arg)
         self.add_global_action('new_loop_audio_track', self.new_loop_audio_track)
         self.add_global_action('launch_loop_tracks', self.launch_loop_tracks)
         self.add_track_action('stop_loop', self.stop_looper_track)
@@ -303,36 +303,63 @@ class ExampleActions(UserActionsBase):
               self.canonical_parent.show_message('no full looper track') 
          
 
-    def decrease_bpm_from_loop_arg(self, action_def, _):
-        """ decreases by 1 the beat numbers of bpm_from_loop argument """
+    def decrease_bpm_from_loop_arg(self, action_def, args):
+        """ decreases by 1 the beat numbers of bpm_from_loop argument or the measures number. if args = 1, measure number, if args = 2, beat numbers"""
         tracks=list(self.song().tracks)
         idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0] 
         init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
-        base_name="[] SEL/user_clip(1) bpm_from_loop " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
+        base_name="[] SEL/bpm_from_loop_new " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
         length_arg=len(init_clip_name)-len(base_name)
-        init_bpm_arg = int(init_clip_name[-length_arg:])
-        if init_bpm_arg > 1:
-              new_bpm_arg = init_bpm_arg-1
+        str_bpm_arg = init_clip_name[-length_arg:]
+        list_bpm_arg=str_bpm_arg.split(' ')
+        meas_arg = int(list_bpm_arg[0])
+        time_arg=int(list_bpm_arg[1])
+        if int(args) == 1: # modify measure numbers
+              if meas_arg > 1:
+                    meas_arg = meas_arg - 1
+              else:
+                    meas_arg=1
+              self.canonical_parent.show_message('new meas arg %s' % meas_arg) 
+              list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + str(meas_arg) + ' ' + list_bpm_arg[1]
+        elif int(args) == 2: # modify beat numbers
+              if time_arg > 1:
+                    time_arg = time_arg-1
+              else:
+                    time_arg=1
+              self.canonical_parent.show_message('new time arg %s' % time_arg) 
+              list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + list_bpm_arg[0] + ' ' + str(time_arg)
         else:
-              new_bpm_arg = 1
-        self.canonical_parent.show_message('new arg %s' % new_bpm_arg) 
-        list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + str(new_bpm_arg)
+              self.canonical_parent.show_message('wrong argument, need 1 or 2' )   
     
-    def increase_bpm_from_loop_arg(self, action_def, _):
-        """ increases by 1 the beat numbers of bpm_from_loop argument """
+    def increase_bpm_from_loop_arg(self, action_def, args):
+        """ increases by 1 the beat numbers of bpm_from_loop argument or the measures number. if args = 1, measure number, if args = 2, beat numbers """              
         tracks=list(self.song().tracks)
         idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0] 
-        self.canonical_parent.show_message('idx beat ctrl trck %s' % idx_bpm_ctrl_track) 
         init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
-        base_name="[] SEL/user_clip(1) bpm_from_loop " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
+        base_name="[] SEL/bpm_from_loop_new " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
         length_arg=len(init_clip_name)-len(base_name)
-        init_bpm_arg = int(init_clip_name[-length_arg:])
-        if init_bpm_arg < 16:
-              new_bpm_arg = init_bpm_arg+1
+        str_bpm_arg = init_clip_name[-length_arg:]
+        list_bpm_arg=str_bpm_arg.split(' ')
+        meas_arg = int(list_bpm_arg[0])
+        time_arg=int(list_bpm_arg[1])
+        self.canonical_parent.show_message('coucou' )   
+        if int(args) == 1: # modify measure numbers
+              if meas_arg < 16:
+                    meas_arg = meas_arg+1
+              else:
+                    meas_arg=16
+              self.canonical_parent.show_message('new meas arg %s' % meas_arg) 
+              list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + str(meas_arg) + ' ' + list_bpm_arg[1]
+        elif int(args) == 2: # modify beat numbers
+              if time_arg < 11:
+                    time_arg = time_arg+1
+              else:
+                    time_arg=11
+              self.canonical_parent.show_message('new time arg %s' % time_arg) 
+              list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + list_bpm_arg[0] + ' ' + str(time_arg)
         else:
-              new_bpm_arg=16
-        self.canonical_parent.show_message('new arg %s' % new_bpm_arg) 
-        list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + str(new_bpm_arg)
+              self.canonical_parent.show_message('wrong argument, need 1 or 2' )   
+      
 
     def play_or_stop_first_clip(self, action_def, _):
         """ plays or stops first clip of track, depending on the actual state """
@@ -453,10 +480,11 @@ class ExampleActions(UserActionsBase):
         """increment plugin preset index in program list"""
         track = action_def['track']   
         track_idx = list(self.song().tracks).index(action_def['track']) 
-        if track.devices[0].selected_preset_index >= 4:
-              track.devices[0].selected_preset_index = 0
+        self.canonical_parent.show_message('devices %s' % track.devices[0].chains[0].devices[0].name)
+        if track.devices[0].chains[0].devices[0].selected_preset_index >= 4:
+              track.devices[0].chains[0].devices[0].selected_preset_index = 0
         else:
-              track.devices[0].selected_preset_index += 1 
+              track.devices[0].chains[0].devices[0].selected_preset_index += 1 
     
     def set_simpler_slice(self, action_def, args):
         """set simpler in slice mode right after being created, split into 1 beat clip"""
@@ -514,6 +542,7 @@ class ExampleActions(UserActionsBase):
     def set_new_bpm_from_loop_length_newVersion(self, action_def, args): 
           # Small delay if try to relaunch in this function directly ==> this fction only sets new bpm and measure length. need to launch after in other command
         """ sets new bpm from indicated clip length in selected track """
+        args=args.split(' ') # we want args = [nb_measures nb_times_in_measure]
         tracks, idx_loop_tracks, nb_loop_tracks, idx_measure_tracks = [self.initialize_variables()[i] for i in (0,1,3,4)]
         sel_track = self.song().view.selected_track
         idx_sel_track = tracks.index(sel_track)
@@ -527,7 +556,7 @@ class ExampleActions(UserActionsBase):
                     self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP' % (int(idx_measure_tracks[i]+1)))
              #  --------------  get current bpm and calculate target bpm -----------------
               length_init = list(tracks[idx_sel_track+nb_loop_tracks].clip_slots)[0].clip.length # initial length based on corresponding measure length
-              length_target = float(args)  
+              length_target = float(args[0])*float(args[1])  
               tempo_init = self.song().tempo
               odd_measures = [3,5,6,7,9,10,11] #List of args that will take into account time sig change
               if length_target in odd_measures:
@@ -537,9 +566,10 @@ class ExampleActions(UserActionsBase):
                     time_sig_factor = 1              
               ratio_length_generic = length_target/length_init*time_sig_factor # can be used for all measure clips and for bpm
               tempo_target = tempo_init*ratio_length_generic
-              self.canonical_parent.show_message('ancient BPM %s new BPM %s' % (tempo_init, tempo_target))             
+              self.canonical_parent.show_message('ancient BPM %s new BPM %s' % (tempo_init, tempo_target))    
             #  --------------  Change bpm -----------------
               self.canonical_parent.clyphx_pro_component.trigger_action_list('BPM %s' % tempo_target )
+
               # -------------------- adjusts length of Measure clips corresponding to existing Loop clips and relaunches them if previously playing ---------------
               for i in range(len(idx_loop_tracks)):
                     cliplength_init = tracks[idx_measure_tracks[i]].clip_slots[0].clip.length
