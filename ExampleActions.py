@@ -184,6 +184,7 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('rec_to_loopers', self.route_rec_into_loopers)
         self.add_global_action('reset_session', self.reset_session)
         self.add_global_action('reset_loopers', self.reset_looper_tracks)
+        self.add_global_action('play_rec_clip', self.play_rec_clip)
 
 # ---------- INITIALIZING FUNCTION : DEF ALL USEFULL VARIABLES --------------
     def initialize_variables(self):
@@ -194,6 +195,7 @@ class ExampleActions(UserActionsBase):
         3 : nb loop_tracks 
         4 : idx measure tracks
         5 : idx measure tracks of full looper tracks
+        6 : routing clip name
         """
         tracks=list(self.song().tracks)
         idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
@@ -201,8 +203,33 @@ class ExampleActions(UserActionsBase):
         nb_loop_tracks = len(idx_loop_tracks)
         idx_measure_tracks = [i+nb_loop_tracks for i in idx_loop_tracks] # Assumption of measure tracks after loop tracks !! IT USED TO BE FOR ONLY FULL LOOPS; MIGHT HAVE PROBLEMS ONE DAY
         idx_measure_tracks_full = [i+nb_loop_tracks for i in idx_loop_full]
-        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full
+        routing_clip_name = list(tracks[0].clip_slots)[-2].clip.name # !!!! ATTENTION l'indice de routing clip name peut changer !!!!
+        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name
 # ----------- END OF INITIALIZING FUNCTION ---------------------
+
+    def play_rec_clip(self, action_def, _):
+        """play top clip of rec. conditions on muting looper tracks depending on the state of routing"""
+        tracks, idx_loop_tracks, name_routing_clip = [self.initialize_variables()[i] for i in (0,1,6)]
+      #   name_muting_clip=list(tracks[0].clip_slots)[-2].clip.name
+      #------------------- Conditions for Muting Loopers -------------
+      # -------------- initial routing. Muting False -----------------
+        if name_routing_clip[-1] == "0": 
+              self.canonical_parent.show_message('routing 0. no mute') 
+              for i in range(len(idx_loop_tracks)):
+                    tracks[idx_loop_tracks[i]].mute=False 
+      # ----------------- Loopers to rec. Si Clip Rec vide : muting false. Si Clip Rec plein : muting True -----------------
+        elif name_routing_clip[-1] == "1":
+              if list(tracks[0].clip_slots)[0].has_clip is False:
+                    self.canonical_parent.show_message('routing 1 empty clip. no mute') 
+                    for i in range(len(idx_loop_tracks)):
+                          tracks[idx_loop_tracks[i]].mute=False 
+              elif list(tracks[0].clip_slots)[0].has_clip is True:
+                    self.canonical_parent.show_message('routing 1 full clip. mute') 
+                    for i in range(len(idx_loop_tracks)):
+                          tracks[idx_loop_tracks[i]].mute=True 
+      # ---------- Play Rec clip ------------
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/PLAY 1')
+
 
     def reset_looper_tracks(self, action_def, _):
         """clear loop clips"""
@@ -230,21 +257,27 @@ class ExampleActions(UserActionsBase):
 
     def route_loopers_into_rec_track(self, action_def, _):
         """Rec track in : piano, out : master, Monitor IN. Loopers in : piano, out : REC, Monitor off, ARM ON on loopers, ON on Rec """
-        tracks=list(self.song().tracks)
+        tracks, idx_loop_tracks, routing_clip_name = [self.initialize_variables()[i] for i in (0,1,6)]
         rec_track_name = tracks[0].name
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; 1/MON IN; 1/ARM ON' )
-        idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name or "Slice" in tracks[i].name] #Test with slice tracks
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; 1/MON AUTO; 1/ARM ON' ) 
         for i in range(len(idx_loop_tracks)):
               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "piano"; %s/OUT "%s"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),rec_track_name,int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
+              tracks[idx_loop_tracks[i]].mute=False 
+      # -------------------- modify routing clip name ---------------   
+        list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "1"  
+        self.canonical_parent.show_message('%s' % routing_clip_name)             
 
     def reset_initial_routing(self, action_def, _):
         """Rec track in : piano, out : master. Same for loopers. Monitor off for all"""
-        tracks=list(self.song().tracks)
-        idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name or "Slice" in tracks[i].name]
+        tracks, idx_loop_tracks, routing_clip_name = [self.initialize_variables()[i] for i in (0,1,6)]
         for i in range(len(idx_loop_tracks)):
               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "piano"; %s/OUT "Master"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
+              tracks[idx_loop_tracks[i]].mute=False 
         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; WAIT 5; 1/MON OFF; 1/ARM ON' )
         self.canonical_parent.clyphx_pro_component.trigger_action_list('"piano"/ARM ON' )
+        # -------------------- modify routing clip name ---------------          
+        list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "0"  
+        self.canonical_parent.show_message('%s' % routing_clip_name)        
 
     def stop_looper_track(self, action_def, arg):
         """stops looper and corresponding measure track """
