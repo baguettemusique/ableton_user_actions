@@ -185,6 +185,8 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('reset_session', self.reset_session)
         self.add_global_action('reset_loopers', self.reset_looper_tracks)
         self.add_global_action('play_rec_clip', self.play_rec_clip)
+        self.add_track_action('tosimp', self.send_first_clip_to_simpler)
+        self.add_global_action('set_last_simpler', self.set_last_simpler_track)
 
 # ---------- INITIALIZING FUNCTION : DEF ALL USEFULL VARIABLES --------------
     def initialize_variables(self):
@@ -196,6 +198,10 @@ class ExampleActions(UserActionsBase):
         4 : idx measure tracks
         5 : idx measure tracks of full looper tracks
         6 : routing clip name
+        7: idx INSTRU group
+        8: idx instrument tracks
+        9 : selected track
+        10 : idx_selected track
         """
         tracks=list(self.song().tracks)
         idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
@@ -204,9 +210,34 @@ class ExampleActions(UserActionsBase):
         idx_measure_tracks = [i+nb_loop_tracks for i in idx_loop_tracks] # Assumption of measure tracks after loop tracks !! IT USED TO BE FOR ONLY FULL LOOPS; MIGHT HAVE PROBLEMS ONE DAY
         idx_measure_tracks_full = [i+nb_loop_tracks for i in idx_loop_full]
         routing_clip_name = list(tracks[0].clip_slots)[-2].clip.name # !!!! ATTENTION l'indice de routing clip name peut changer !!!!
-        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name
+        idx_instru_group = [i for i in range(len(tracks)) if "INSTRU" in tracks[i].name][0] # ATTENTION le nom peut changer
+        idx_instru_tracks = [i for i in range(len(tracks)) if i > idx_instru_group and tracks[i].is_grouped is True] # ATTENTION la def peut changer
+        sel_track = self.song().view.selected_track
+        idx_sel_track = tracks.index(sel_track)
+        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track
 # ----------- END OF INITIALIZING FUNCTION ---------------------
 
+    def set_last_simpler_track(self, action_def, _):
+        """use set_simpler_slice on the most recent TOSIMP track"""
+      #   track=action_def['track']
+      #   idx_track = list(self.song().tracks).index(action_def['track'])
+        tracks, idx_instru_group, idx_instru_tracks, idx_sel_track_init = [self.initialize_variables()[i] for i in (0,7,8,10)]
+        self.canonical_parent.show_message('idx instru tracks : %s' % idx_instru_tracks) 
+        idx_last_instru = idx_instru_tracks[-1]
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/set_simpler_slice 4' % int(idx_last_instru+1) )
+
+    def send_first_clip_to_simpler(self, action_def, _):
+        """new slice track in INSTRU group, settings, naming it properly"""
+        track=action_def['track']
+        idx_track = list(self.song().tracks).index(action_def['track'])
+        tracks, idx_instru_group, idx_instru_tracks, idx_sel_track_init = [self.initialize_variables()[i] for i in (0,7,8,10)]
+        self.canonical_parent.show_message('pouet : ' ) 
+        self.canonical_parent.show_message('idx instru tracks : %s' % idx_instru_tracks) 
+        idx_last_instru = idx_instru_tracks[-1]
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/SEL ; %s/CLIP(1) TOSIMP ; WAIT 10 ; %s/SEL' % (int(idx_last_instru+1),int(idx_track+1), int(idx_sel_track_init+1)) )
+      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/set_simpler_slice 4' % int(idx_last_instru+2) )
+      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/SEL' % (int(idx_last_instru+1)),int(idx_track+1) )
+      
     def play_rec_clip(self, action_def, _):
         """play top clip of rec. conditions on muting looper tracks depending on the state of routing"""
         tracks, idx_loop_tracks, name_routing_clip = [self.initialize_variables()[i] for i in (0,1,6)]
@@ -540,13 +571,21 @@ class ExampleActions(UserActionsBase):
         """set simpler in slice mode right after being created, split into 1 beat clip"""
         track = action_def['track']   
         track_idx = list(self.song().tracks).index(action_def['track']) 
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ARM ON ; SEL/INSUB "Ch. 16"')
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/NAME "Slice"')
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV(1) SIMP PLAYMODE 3 ; SEL/DEV(1) SIMP WARP ON ; SEL/DEV(1) SIMP GATE OFF') #mode 3 = slice
-        simpler=track.devices[0]
-        simpler.sample.slicing_style = 1 # slice by beat
-        simpler.sample.slicing_beat_division = int(args) # test
-        simpler.sample.gain = 0.6 # => 8 db ?
+        tracks, sel_track = [self.initialize_variables()[i] for i in (0,9)]
+        self.canonical_parent.show_message('sel track name : %s' % sel_track.name)
+        if sel_track.name == "piano":
+              self.canonical_parent.show_message('error : piano track selected')
+        else:
+              idx_slice_tracks = [i for i in range(len(tracks)) if "Slice" in tracks[i].name]
+              #   self.canonical_parent.show_message('idx slice tracks : %s' % idx_slice_tracks)
+              slice_track_name = "Slice " + str(len(idx_slice_tracks))
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ARM ON ; SEL/INSUB "Ch. 16"')
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/NAME "%s"' % slice_track_name)
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV(1) SIMP PLAYMODE 3 ; SEL/DEV(1) SIMP WARP ON ; SEL/DEV(1) SIMP GATE OFF') #mode 3 = slice
+              simpler=track.devices[0]
+              simpler.sample.slicing_style = 1 # slice by beat
+              simpler.sample.slicing_beat_division = int(args) # test
+              simpler.sample.gain = 0.6 # => 8 db ?
       
         
     def play_counting_from_last_clip(self, action_def, args):
