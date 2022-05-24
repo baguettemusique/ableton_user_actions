@@ -157,6 +157,7 @@ class ExampleActions(UserActionsBase):
         self.add_device_action('ex_device', self.device_action_example)
         self.add_clip_action('ex_clip', self.clip_action_example)
         self.add_global_action('test_global', self.global_action_test)
+        # ---------- my user actions ----------
         self.add_clip_action('get_clip_length', self.get_clip_length)
         self.add_track_action('bpm_from_loop_new', self.set_new_bpm_from_loop_length_newVersion)
         self.add_track_action('get_track_index', self.get_track_index)
@@ -187,6 +188,8 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('play_rec_clip', self.play_rec_clip)
         self.add_track_action('tosimp', self.send_first_clip_to_simpler)
         self.add_global_action('set_last_simpler', self.set_last_simpler_track)
+        self.add_global_action('reset_instru', self.reset_instru_tracks)
+        self.add_global_action('switch_armed_instru', self.switch_armed_instru)
 
 # ---------- INITIALIZING FUNCTION : DEF ALL USEFULL VARIABLES --------------
     def initialize_variables(self):
@@ -217,6 +220,25 @@ class ExampleActions(UserActionsBase):
         return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track
 # ----------- END OF INITIALIZING FUNCTION ---------------------
 
+    def switch_armed_instru(self, action_def, _):
+        """arm the instrument track next to that already armed, disarms all other"""
+        tracks, idx_instru_group, idx_instru_tracks = [self.initialize_variables()[i] for i in (0,7,8)]
+        idx_armed_instru = [idx_instru_tracks[i] for i in range(len(idx_instru_tracks)) if tracks[idx_instru_tracks[i]].arm]
+        self.canonical_parent.show_message('idx instru armed : %s' % idx_armed_instru) 
+        # Disarm current armed instru track and arms the next instru track (or arms the 1st instru track if the current armed track is the last instru)
+        tracks[idx_armed_instru[0]].arm = False
+        if idx_armed_instru[0]+1 <= max(idx_instru_tracks):
+              tracks[idx_armed_instru[0]+1].arm = True
+        else:
+              tracks[idx_instru_tracks[0]].arm = True
+
+
+    def reset_instru_tracks(self, action_def, _):
+        """deleted all tracks from INSTRU group excepted piano"""
+        tracks, idx_instru_group, idx_instru_tracks = [self.initialize_variables()[i] for i in (0,7,8)]
+        for i in range(len(idx_instru_tracks)-1):
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/DEL' % int(idx_instru_tracks[-1-i]+1) )
+      # 
     def set_last_simpler_track(self, action_def, _):
         """use set_simpler_slice on the most recent TOSIMP track"""
       #   track=action_def['track']
@@ -224,6 +246,7 @@ class ExampleActions(UserActionsBase):
         tracks, idx_instru_group, idx_instru_tracks, idx_sel_track_init = [self.initialize_variables()[i] for i in (0,7,8,10)]
         self.canonical_parent.show_message('idx instru tracks : %s' % idx_instru_tracks) 
         idx_last_instru = idx_instru_tracks[-1]
+        self.canonical_parent.show_message('idx last instru tracks : %s' % idx_last_instru) 
         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/set_simpler_slice 4' % int(idx_last_instru+1) )
 
     def send_first_clip_to_simpler(self, action_def, _):
@@ -274,6 +297,7 @@ class ExampleActions(UserActionsBase):
         """No loop, no rec, MON in """
         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/CLIP(1) DEL' )
         self.canonical_parent.clyphx_pro_component.trigger_action_list('reset_loopers' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('reset_instru' )
         self.canonical_parent.clyphx_pro_component.trigger_action_list('initial_routing' )
 
 
@@ -292,7 +316,7 @@ class ExampleActions(UserActionsBase):
         rec_track_name = tracks[0].name
         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; 1/MON AUTO; 1/ARM ON' ) 
         for i in range(len(idx_loop_tracks)):
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "piano"; %s/OUT "%s"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),rec_track_name,int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "INSTRU"; %s/OUT "%s"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),rec_track_name,int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
               tracks[idx_loop_tracks[i]].mute=False 
       # -------------------- modify routing clip name ---------------   
         list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "1"  
@@ -302,9 +326,9 @@ class ExampleActions(UserActionsBase):
         """Rec track in : piano, out : master. Same for loopers. Monitor off for all"""
         tracks, idx_loop_tracks, routing_clip_name = [self.initialize_variables()[i] for i in (0,1,6)]
         for i in range(len(idx_loop_tracks)):
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "piano"; %s/OUT "Master"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "INSTRU"; %s/OUT "Master"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
               tracks[idx_loop_tracks[i]].mute=False 
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; WAIT 5; 1/MON OFF; 1/ARM ON' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "INSTRU"; 1/OUT "Master"; WAIT 5; 1/MON OFF; 1/ARM ON' )
         self.canonical_parent.clyphx_pro_component.trigger_action_list('"piano"/ARM ON' )
         # -------------------- modify routing clip name ---------------          
         list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "0"  
@@ -571,21 +595,24 @@ class ExampleActions(UserActionsBase):
         """set simpler in slice mode right after being created, split into 1 beat clip"""
         track = action_def['track']   
         track_idx = list(self.song().tracks).index(action_def['track']) 
-        tracks, sel_track = [self.initialize_variables()[i] for i in (0,9)]
-        self.canonical_parent.show_message('sel track name : %s' % sel_track.name)
-        if sel_track.name == "piano":
-              self.canonical_parent.show_message('error : piano track selected')
+        tracks, sel_track_init = [self.initialize_variables()[i] for i in (0,9)]
+        self.canonical_parent.show_message('target track name : %s' % track.name)
+        if track.name == "piano":
+              self.canonical_parent.show_message('error : piano track targeted')
         else:
               idx_slice_tracks = [i for i in range(len(tracks)) if "Slice" in tracks[i].name]
               #   self.canonical_parent.show_message('idx slice tracks : %s' % idx_slice_tracks)
               slice_track_name = "Slice " + str(len(idx_slice_tracks))
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ARM ON ; SEL/INSUB "Ch. 16"')
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/SEL' % int(track_idx+1))
+            #   self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ARM ON ; SEL/INSUB "Ch. 3"') # TO CHANGE IF NEEDED
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/INSUB "Ch. 3"') # TO CHANGE IF NEEDED
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/NAME "%s"' % slice_track_name)
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV(1) SIMP PLAYMODE 3 ; SEL/DEV(1) SIMP WARP ON ; SEL/DEV(1) SIMP GATE OFF') #mode 3 = slice
               simpler=track.devices[0]
               simpler.sample.slicing_style = 1 # slice by beat
               simpler.sample.slicing_beat_division = int(args) # test
               simpler.sample.gain = 0.6 # => 8 db ?
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/SEL' % int(sel_track_init+1))
       
         
     def play_counting_from_last_clip(self, action_def, args):
