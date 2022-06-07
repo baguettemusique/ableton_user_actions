@@ -190,6 +190,11 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('set_last_simpler', self.set_last_simpler_track)
         self.add_global_action('reset_instru', self.reset_instru_tracks)
         self.add_global_action('switch_armed_instru', self.switch_armed_instru)
+        self.add_global_action('bind_instru', self.bind_instru)
+        self.add_global_action('bind_specific', self.bind_specific)
+        self.add_global_action('bind_global', self.bind_global)
+        self.add_global_action('navigate_beat', self.set_next_beat_to_first_scene)
+
 
 # ---------- INITIALIZING FUNCTION : DEF ALL USEFULL VARIABLES --------------
     def initialize_variables(self):
@@ -205,6 +210,7 @@ class ExampleActions(UserActionsBase):
         8: idx instrument tracks
         9 : selected track
         10 : idx_selected track
+        11: idx_loops_out_track
         """
         tracks=list(self.song().tracks)
         idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
@@ -217,8 +223,70 @@ class ExampleActions(UserActionsBase):
         idx_instru_tracks = [i for i in range(len(tracks)) if i > idx_instru_group and tracks[i].is_grouped is True] # ATTENTION la def peut changer
         sel_track = self.song().view.selected_track
         idx_sel_track = tracks.index(sel_track)
-        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track
+        idx_loops_out_track = [i for i in range(len(tracks)) if "LOOPS_OUT" in tracks[i].name][0]
+        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track
 # ----------- END OF INITIALIZING FUNCTION ---------------------
+
+
+    def set_next_beat_to_first_scene(self, action_def, _):
+        """navigates in beats present in "Beats" track, sends the next one to first scene to be launched when button is used"""
+        self.canonical_parent.show_message('louliloul00')
+        tracks, idx_sel_track = [self.initialize_variables()[i] for i in (0,10)]
+        self.canonical_parent.show_message('louliloul')
+        self.canonical_parent.show_message('tracks %s ' % tracks)
+        beats_track = [tracks[i] for i in range(len(tracks)) if "Beats" in tracks[i].name][0]
+        self.canonical_parent.show_message('beats_track %s ' % beats_track)
+        # -------------- find current beat name and where in the beats list it is --------------
+        slots = list(beats_track.clip_slots)
+        full_slots=[slots[i] for i in range(len(slots)) if slots[i].has_clip is True]
+        self.canonical_parent.show_message('full slots : %s' % full_slots ) 
+        idx_current_beat = [i for i in range(len(full_slots))[1:] if full_slots[i].clip.name == slots[0].clip.name][0]
+        self.canonical_parent.show_message('idx current beat : %s' % int(idx_current_beat+1) ) 
+        if idx_current_beat < len(full_slots)-1:
+              idx_new_beat = idx_current_beat+1
+        else:
+              idx_new_beat = 1
+      #  -------------- launches the function to the new beat, selected back previously selected track  --------------
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('"Beats"/SEL %s; "Beats"/send_beat_to_main_scene' % int(idx_new_beat+1))
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/SEL' % int(idx_sel_track+1))
+        self.canonical_parent.show_message('new beat in main scene %s ' % slots[idx_new_beat].clip.name)
+      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('"Beats"/CLIP(%s) SEL' % int(idx_current_beat+2))
+      # self.canonical_parent.clyphx_pro_component.trigger_action_list('"Beats" send_beat_to_main_scene' )
+
+    def bind_global(self, action_def, _):
+        """global binding mode. binding linked to 1st param of the 4 musical tracks"""
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_1 "REC"/DEV("MainDev") B1 P1' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_2 "LOOPS_OUT"/DEV("MainDev") B1 P1' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_3 "INSTRU"/DEV("MainDev") B1 P1' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_4 "Beats"/DEV("MainDev") B1 P1' )
+        self.canonical_parent.show_message('bind : global' ) 
+      #   rename binding clip 
+        tracks = list(self.song().tracks)
+        list(tracks[0].clip_slots)[-3].clip.name = "bind : global"
+
+
+    def bind_specific(self, action_def, _):
+        """specific binding mode. binding linked to selected track"""
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_1 SEL/DEV("MainDev") B1 P1' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_2 SEL/DEV("MainDev") B1 P2' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_3 SEL/DEV("MainDev") B1 P3' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_4 SEL/DEV("MainDev") B1 P4' )
+        self.canonical_parent.show_message('bind : specific' ) 
+        #   rename binding clip 
+        tracks = list(self.song().tracks)
+        list(tracks[0].clip_slots)[-3].clip.name = "bind : specific"
+
+
+    def bind_instru(self, action_def, _):
+        """initial binding mode to instru parameters"""
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_1 "INSTRU"/DEV("MainDev") B1 P1' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_2 "INSTRU"/DEV("MainDev") B1 P2' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_3 "INSTRU"/DEV("MainDev") B1 P3' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('BIND ALESIS_KNOB_4 "INSTRU"/DEV("MainDev") B1 P4' )
+        self.canonical_parent.show_message('bind : instru' ) 
+        #   rename binding clip 
+        tracks = list(self.song().tracks)
+        list(tracks[0].clip_slots)[-3].clip.name = "bind : instru"
 
     def switch_armed_instru(self, action_def, _):
         """arm the instrument track next to that already armed, disarms all other"""
@@ -236,8 +304,9 @@ class ExampleActions(UserActionsBase):
     def reset_instru_tracks(self, action_def, _):
         """deleted all tracks from INSTRU group excepted piano"""
         tracks, idx_instru_group, idx_instru_tracks = [self.initialize_variables()[i] for i in (0,7,8)]
-        for i in range(len(idx_instru_tracks)-1):
+        for i in range(len(idx_instru_tracks)-2):
               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/DEL' % int(idx_instru_tracks[-1-i]+1) )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('"piano"/ARM ON')
       # 
     def set_last_simpler_track(self, action_def, _):
         """use set_simpler_slice on the most recent TOSIMP track"""
@@ -299,6 +368,7 @@ class ExampleActions(UserActionsBase):
         self.canonical_parent.clyphx_pro_component.trigger_action_list('reset_loopers' )
         self.canonical_parent.clyphx_pro_component.trigger_action_list('reset_instru' )
         self.canonical_parent.clyphx_pro_component.trigger_action_list('initial_routing' )
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('bind_instru' )
 
 
     def route_rec_into_loopers(self, action_def, _): # Useless. better to do a Rec2 track, and then rec it back to rec1
@@ -310,29 +380,54 @@ class ExampleActions(UserActionsBase):
         for i in range(len(idx_loop_tracks)):
               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "Rec"; %s/OUT "Master"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
 
+#     def route_loopers_into_rec_track(self, action_def, _):
+#         """Rec track in : piano, out : master, Monitor IN. Loopers in : piano, out : REC, Monitor off, ARM ON on loopers, ON on Rec """
+#         tracks, idx_loop_tracks, routing_clip_name = [self.initialize_variables()[i] for i in (0,1,6)]
+#         rec_track_name = tracks[0].name
+#         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; 1/MON AUTO; 1/ARM ON' ) 
+#         for i in range(len(idx_loop_tracks)):
+#               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "INSTRU"; %s/OUT "%s"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),rec_track_name,int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
+#               tracks[idx_loop_tracks[i]].mute=False 
+#       # -------------------- modify routing clip name ---------------   
+#         list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "1"  
+#         self.canonical_parent.show_message('%s' % routing_clip_name)   
+
     def route_loopers_into_rec_track(self, action_def, _):
         """Rec track in : piano, out : master, Monitor IN. Loopers in : piano, out : REC, Monitor off, ARM ON on loopers, ON on Rec """
-        tracks, idx_loop_tracks, routing_clip_name = [self.initialize_variables()[i] for i in (0,1,6)]
+        tracks, idx_loop_tracks, routing_clip_name, idx_loops_out_track = [self.initialize_variables()[i] for i in (0,1,6,11)]
         rec_track_name = tracks[0].name
         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "piano"; 1/OUT "Master"; 1/MON AUTO; 1/ARM ON' ) 
-        for i in range(len(idx_loop_tracks)):
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "INSTRU"; %s/OUT "%s"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),rec_track_name,int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
-              tracks[idx_loop_tracks[i]].mute=False 
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/OUT "%s"; %s/MON IN; %s/ARM OFF' % (int(idx_loops_out_track+1),rec_track_name,int(idx_loops_out_track+1),int(idx_loops_out_track+1)) )
+        tracks[idx_loops_out_track].mute=False 
       # -------------------- modify routing clip name ---------------   
         list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "1"  
         self.canonical_parent.show_message('%s' % routing_clip_name)             
+          
 
+#     def reset_initial_routing(self, action_def, _):
+#         """Rec track in : piano, out : master. Same for loopers. Monitor off for all"""
+#         tracks, idx_loop_tracks, routing_clip_name = [self.initialize_variables()[i] for i in (0,1,6)]
+#         for i in range(len(idx_loop_tracks)):
+#               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "INSTRU"; %s/OUT "Master"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
+#               tracks[idx_loop_tracks[i]].mute=False 
+#         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "INSTRU"; 1/OUT "Master"; WAIT 5; 1/MON OFF; 1/ARM ON' )
+#         self.canonical_parent.clyphx_pro_component.trigger_action_list('"piano"/ARM ON' )
+#         # -------------------- modify routing clip name ---------------          
+#         list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "0"  
+#         self.canonical_parent.show_message('%s' % routing_clip_name)     
+        
     def reset_initial_routing(self, action_def, _):
         """Rec track in : piano, out : master. Same for loopers. Monitor off for all"""
-        tracks, idx_loop_tracks, routing_clip_name = [self.initialize_variables()[i] for i in (0,1,6)]
-        for i in range(len(idx_loop_tracks)):
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "INSTRU"; %s/OUT "Master"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
-              tracks[idx_loop_tracks[i]].mute=False 
+        tracks, idx_loop_tracks, routing_clip_name, idx_loops_out_track = [self.initialize_variables()[i] for i in (0,1,6,11)]
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/OUT "Master"; %s/MON IN; %s/ARM OFF' % (int(idx_loops_out_track+1),int(idx_loops_out_track+1),int(idx_loops_out_track+1)) )
+        tracks[idx_loops_out_track].mute=False 
         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "INSTRU"; 1/OUT "Master"; WAIT 5; 1/MON OFF; 1/ARM ON' )
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('"piano"/ARM ON' )
+      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('"piano"/ARM ON' )
         # -------------------- modify routing clip name ---------------          
         list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "0"  
-        self.canonical_parent.show_message('%s' % routing_clip_name)        
+        self.canonical_parent.show_message('%s' % routing_clip_name)     
+        
+   
 
     def stop_looper_track(self, action_def, arg):
         """stops looper and corresponding measure track """
@@ -397,7 +492,8 @@ class ExampleActions(UserActionsBase):
         tracks=list(self.song().tracks)
         idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0] 
         init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
-        base_name="[] SEL/bpm_from_loop_new " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
+      #   base_name="[] SEL/bpm_from_loop_new " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
+        base_name=init_clip_name[0:-3]
         length_arg=len(init_clip_name)-len(base_name)
         str_bpm_arg = init_clip_name[-length_arg:]
         list_bpm_arg=str_bpm_arg.split(' ')
@@ -425,7 +521,8 @@ class ExampleActions(UserActionsBase):
         tracks=list(self.song().tracks)
         idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0] 
         init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
-        base_name="[] SEL/bpm_from_loop_new " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
+      #   base_name="[] SEL/bpm_from_loop_new " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
+        base_name=init_clip_name[0:-3]
         length_arg=len(init_clip_name)-len(base_name)
         str_bpm_arg = init_clip_name[-length_arg:]
         list_bpm_arg=str_bpm_arg.split(' ')
@@ -433,10 +530,10 @@ class ExampleActions(UserActionsBase):
         time_arg=int(list_bpm_arg[1])
         self.canonical_parent.show_message('coucou' )   
         if int(args) == 1: # modify measure numbers
-              if meas_arg < 16:
+              if meas_arg < 8:
                     meas_arg = meas_arg+1
               else:
-                    meas_arg=16
+                    meas_arg=8
               self.canonical_parent.show_message('new meas arg %s' % meas_arg) 
               list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + str(meas_arg) + ' ' + list_bpm_arg[1]
         elif int(args) == 2: # modify beat numbers
@@ -496,7 +593,7 @@ class ExampleActions(UserActionsBase):
     def navigate_in_music_clips(self, action_def, _):
         """ selects next clip in selected track if sel track is music track. other wise selects Rec track 1st clip """
         tracks=list(self.song().tracks)
-        string_music_track_names=["test","Rec","Beats","Bass"] # strings that will make a track considered as "music track"
+        string_music_track_names=["test","REC","Beats","Bass"] # strings that will make a track considered as "music track"
         idx_music_tracks = []
         sel_track = self.song().view.selected_track
         idx_sel_track = tracks.index(sel_track)
@@ -523,7 +620,7 @@ class ExampleActions(UserActionsBase):
     def navigate_in_music_tracks(self, action_def, _):
         """ selects next track among Simpler tracks, Rec track, Beat track, Bass track, Slice track """
         tracks=list(self.song().tracks)
-        string_music_track_names=["Simpler","test","Rec","Beats","Slice","Bass","piano","Loop"] # strings that will make a track considered as "music track"
+        string_music_track_names=["REC","Beats","Slice","Bass","piano","LOOPS_OUT","Loop","INSTRU"] # strings that will make a track considered as "music track"
         idx_music_tracks = []
         sel_track = self.song().view.selected_track
         idx_sel_track = tracks.index(sel_track)
@@ -538,7 +635,7 @@ class ExampleActions(UserActionsBase):
               else:
                     new_sel_idx = idx_music_tracks[0]
         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/SEL' % int(new_sel_idx+1)) 
-        self.canonical_parent.show_message('new_sel_idx %s' % int(new_sel_idx+1))
+        self.canonical_parent.show_message('sel track %s' % sel_track.name)
                 
       
     def autoset_binklooper_beats(self, action_def, _):
@@ -607,7 +704,7 @@ class ExampleActions(UserActionsBase):
             #   self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/ARM ON ; SEL/INSUB "Ch. 3"') # TO CHANGE IF NEEDED
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/INSUB "Ch. 3"') # TO CHANGE IF NEEDED
               self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/NAME "%s"' % slice_track_name)
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV(1) SIMP PLAYMODE 3 ; SEL/DEV(1) SIMP WARP ON ; SEL/DEV(1) SIMP GATE OFF') #mode 3 = slice
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('SEL/DEV(1) SIMP PLAYMODE 3 ; SEL/DEV(1) SIMP WARP ON ; SEL/DEV(1) SIMP GATE OFF ; SEL/DEV(1) "Fade In" 40') #mode 3 = slice
               simpler=track.devices[0]
               simpler.sample.slicing_style = 1 # slice by beat
               simpler.sample.slicing_beat_division = int(args) # test
