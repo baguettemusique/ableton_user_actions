@@ -194,6 +194,9 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('bind_specific', self.bind_specific)
         self.add_global_action('bind_global', self.bind_global)
         self.add_global_action('navigate_beat', self.set_next_beat_to_first_scene)
+        self.add_global_action('tiny_config', self.set_tinypad_configuration)
+      #   self.add_global_action('see_looper_param', self.see_looper_param)
+
 
 
 # ---------- INITIALIZING FUNCTION : DEF ALL USEFULL VARIABLES --------------
@@ -227,6 +230,85 @@ class ExampleActions(UserActionsBase):
         return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track
 # ----------- END OF INITIALIZING FUNCTION ---------------------
 
+#     def see_looper_param(self, action_def, _):
+#         """"""
+#         tracks, idx_instru_group=[self.initialize_variables()[i] for i in (0,7)]
+#         instru_track = tracks[idx_instru_group]
+#         instru_devices = list(instru_track.devices)
+#         idx_looper_device = [i for i in range(len(instru_devices)) if instru_devices[i].name=="Looper"][0]
+#         looper_device=instru_devices[idx_looper_device]
+#         looper_parameters=list(looper_device.parameters)
+#         param_names = [looper_parameters[i].name for i in range(len(looper_parameters))]
+#         self.canonical_parent.show_message('param names %s' % param_names ) 
+    
+
+    def set_tinypad_configuration(self, action_def, arg):
+        """as transport buttons are not supported for button binding in clyphx, this function changes the name of xclips with transport button functions depending on argument"""
+        tracks=list(self.song().tracks)
+        idx_tiny_transport_track = [i for i in range(len(tracks)) if "TinyTransports" in tracks[i].name ][0] # Carefull of not changing name of track
+        tiny_transport_track=tracks[idx_tiny_transport_track]
+        idx_tiny_notes_track=[i for i in range(len(tracks)) if "TinyNotes" in tracks[i].name ][0] # Carefull of not changing name of track
+        tiny_notes_track=tracks[idx_tiny_notes_track]
+        if arg == "0" :
+            tiny_transport_track.clip_slots[0].clip.name="[] 1/CLIP(1) DEL"
+            tiny_transport_track.clip_slots[1].clip.name="[] navigate_tracks"
+            tiny_transport_track.clip_slots[2].clip.name="[] navigate_clips"
+            tiny_transport_track.clip_slots[3].clip.name="SOME MACRO FUNCTION"
+            tiny_transport_track.clip_slots[4].clip.name='[] "piano"/SEL ; "piano"/plugin_preset_change'
+            tiny_transport_track.clip_slots[5].clip.name="[] switch_armed_instru"
+            # ----
+            tiny_notes_track.clip_slots[0].clip.name="[] inc_bpm_from_loop_arg 1"
+            tiny_notes_track.clip_slots[1].clip.name="[] dec_bpm_from_loop_arg 1"
+            tiny_notes_track.clip_slots[2].clip.name="[] inc_bpm_from_loop_arg 2"
+            tiny_notes_track.clip_slots[3].clip.name="[] dec_bpm_from_loop_arg 2"
+            tiny_notes_track.clip_slots[4].clip.name="[] inc_binklooper_beats"
+            tiny_notes_track.clip_slots[5].clip.name="[] dec_binklooper_beats"
+            tiny_notes_track.clip_slots[6].clip.name='[] "REC"/tosimp'
+            tiny_notes_track.clip_slots[7].clip.name="[] autoset_binklooper_beats"
+            tiny_notes_track.clip_slots[8].clip.name="[] SEL/send_beat_to_main_scene"
+            tiny_notes_track.clip_slots[9].clip.name="[] (PSEQ) bind_instru ; bind_global ; bind_specific"
+            tiny_notes_track.clip_slots[10].clip.name="[routing0] initial_routing"
+            tiny_notes_track.clip_slots[11].clip.name="[routing1] loopers_to_rec"
+           
+
+        elif arg == "1":
+            tiny_transport_track.clip_slots[0].clip.name='[] "INSTRU"/DEV("Looper") "State" "Overdub"'
+            tiny_transport_track.clip_slots[1].clip.name='[] "INSTRU"/DEV("Looper") "Speed" < 21'
+            tiny_transport_track.clip_slots[2].clip.name='[] "INSTRU"/DEV("Looper") "Speed" > 21'
+            tiny_transport_track.clip_slots[3].clip.name='[] "INSTRU"/DEV("Looper") "State" "Record"'
+            tiny_transport_track.clip_slots[4].clip.name='[] "INSTRU"/DEV("Looper") "State" "Stop"'
+            tiny_transport_track.clip_slots[5].clip.name='[] "INSTRU"/DEV("Looper") "State" "Play"'
+            # ----
+            tiny_notes_track.clip_slots[0].clip.name="[] 2/play_or_stop"
+            tiny_notes_track.clip_slots[1].clip.name="[] 2/stop_loop; 2/CLIP(1) DEL"
+            tiny_notes_track.clip_slots[2].clip.name="[] 3/play_or_stop"
+            tiny_notes_track.clip_slots[3].clip.name="[] 3/stop_loop; 3/CLIP(1) DEL"
+            tiny_notes_track.clip_slots[4].clip.name="[] 4/play_or_stop"
+            tiny_notes_track.clip_slots[5].clip.name="[] 4/stop_loop; 4/CLIP(1) DEL"
+            tiny_notes_track.clip_slots[6].clip.name="[] 5/play_or_stop"
+            tiny_notes_track.clip_slots[7].clip.name="[] 5/stop_loop; 5/CLIP(1) DEL"
+
+            # tiny_notes_track.clip_slots[4].clip.name="[] inc_binklooper_beats"
+            # tiny_notes_track.clip_slots[5].clip.name="[] dec_binklooper_beats"
+            # tiny_notes_track.clip_slots[6].clip.name='[] "REC"/tosimp'
+            # tiny_notes_track.clip_slots[7].clip.name="[] autoset_binklooper_beats"
+            # tiny_notes_track.clip_slots[8].clip.name="[] SEL/send_beat_to_main_scene"
+            # tiny_notes_track.clip_slots[9].clip.name="[] (PSEQ) bind_instru ; bind_global ; bind_specific"
+            # tiny_notes_track.clip_slots[10].clip.name="[routing0] initial_routing"
+            # tiny_notes_track.clip_slots[11].clip.name="[routing1] loopers_to_rec"
+           
+
+      #   elif arg == "2":
+      #       tiny_transport_track.clip_slots[0].clip.name='[] "INSTRU"/DEV("Looper") "State" "Overdub"'
+      #       tiny_transport_track.clip_slots[0].clip.name="[] 1/CLIP(1) DEL"
+      #       tiny_transport_track.clip_slots[1].clip.name="[] navigate_tracks"
+      #       tiny_transport_track.clip_slots[2].clip.name="[] navigate_clips"
+      #       tiny_transport_track.clip_slots[3].clip.name='[] "INSTRU"/DEV("Looper") "State" "Record"'
+      #       tiny_transport_track.clip_slots[4].clip.name='[] "INSTRU"/DEV("Looper") "State" "Stop"'
+      #       tiny_transport_track.clip_slots[5].clip.name='[] "INSTRU"/DEV("Looper") "State" "Play"'
+
+        self.canonical_parent.show_message('tiny name %s' % tiny_transport_track.clip_slots[0].clip.name ) 
+      
 
     def set_next_beat_to_first_scene(self, action_def, _):
         """navigates in beats present in "Beats" track, sends the next one to first scene to be launched when button is used"""
@@ -423,6 +505,9 @@ class ExampleActions(UserActionsBase):
         tracks[idx_loops_out_track].mute=False 
         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "INSTRU"; 1/OUT "Master"; WAIT 5; 1/MON OFF; 1/ARM ON' )
       #   self.canonical_parent.clyphx_pro_component.trigger_action_list('"piano"/ARM ON' )
+        for i in range(len(idx_loop_tracks)):
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/MUTE OFF' % (int(idx_loop_tracks[i]+1)) )
+
         # -------------------- modify routing clip name ---------------          
         list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "0"  
         self.canonical_parent.show_message('%s' % routing_clip_name)     
