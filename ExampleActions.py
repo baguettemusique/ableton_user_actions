@@ -195,6 +195,8 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('bind_global', self.bind_global)
         self.add_global_action('navigate_beat', self.set_next_beat_to_first_scene)
         self.add_global_action('tiny_config', self.set_tinypad_configuration)
+        self.add_global_action('bpm_1bar_clip', self.set_bpm_from_1bar_clip)
+
       #   self.add_global_action('see_looper_param', self.see_looper_param)
 
 
@@ -214,6 +216,8 @@ class ExampleActions(UserActionsBase):
         9 : selected track
         10 : idx_selected track
         11: idx_loops_out_track
+        12 : idx_beats_group
+        13 : idx_bpm_ctrl_track
         """
         tracks=list(self.song().tracks)
         idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
@@ -223,11 +227,13 @@ class ExampleActions(UserActionsBase):
         idx_measure_tracks_full = [i+nb_loop_tracks for i in idx_loop_full]
         routing_clip_name = list(tracks[0].clip_slots)[-2].clip.name # !!!! ATTENTION l'indice de routing clip name peut changer !!!!
         idx_instru_group = [i for i in range(len(tracks)) if "INSTRU" in tracks[i].name][0] # ATTENTION le nom peut changer
-        idx_instru_tracks = [i for i in range(len(tracks)) if i > idx_instru_group and tracks[i].is_grouped is True] # ATTENTION la def peut changer
+        idx_beats_group = [i for i in range(len(tracks)) if "GrpBeet" in tracks[i].name][0] # ATTENTION le nom peut changer
+        idx_instru_tracks = [i for i in range(len(tracks)) if i > idx_instru_group and i < idx_beats_group and tracks[i].is_grouped is True] # ATTENTION la def peut changer
         sel_track = self.song().view.selected_track
         idx_sel_track = tracks.index(sel_track)
         idx_loops_out_track = [i for i in range(len(tracks)) if "LOOPS_OUT" in tracks[i].name][0]
-        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track
+        idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0]
+        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track
 # ----------- END OF INITIALIZING FUNCTION ---------------------
 
 #     def see_looper_param(self, action_def, _):
@@ -240,7 +246,35 @@ class ExampleActions(UserActionsBase):
 #         looper_parameters=list(looper_device.parameters)
 #         param_names = [looper_parameters[i].name for i in range(len(looper_parameters))]
 #         self.canonical_parent.show_message('param names %s' % param_names ) 
-    
+
+    def set_bpm_from_1bar_clip(self, action_def, _):
+        """1 click : rec empty midi clip. 2nd click : stops rec, set bpm from midi clip length (1 bar)"""
+        tracks, idx_bpm_ctrl_track = [self.initialize_variables()[i] for i in (0,13)]
+        track_bpm = tracks[idx_bpm_ctrl_track]
+        bpm_slots = list(track_bpm.clip_slots)
+       # --------- find dummy slot and test if clip already existing or not ----------
+        idx_cmd_1bar_slot=[i for i in range(len(bpm_slots)) if bpm_slots[i].has_clip and "bpm_1bar_clip" in bpm_slots[i].clip.name][0]
+        idx_dummy_slot = idx_cmd_1bar_slot+1
+        dummy_slot = bpm_slots[idx_dummy_slot] # the dummy slot to be created, measured and deleted is just under the command slot
+        if dummy_slot.has_clip :
+            self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/ARM OFF' % int(idx_bpm_ctrl_track+1) )
+            self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP' % int(idx_bpm_ctrl_track+1) )
+            # ------------------- get dummy clip length, delete dummy clip and set new bpm -------------------
+            length_init = dummy_slot.clip.length # initial length based on corresponding measure length
+            self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) DEL' % (int(idx_bpm_ctrl_track+1), int(idx_dummy_slot+1)) )
+            length_target = 4
+            tempo_init = self.song().tempo
+            tempo_target = tempo_init*length_target/length_init
+            self.canonical_parent.show_message('ancient BPM %s new BPM %s' % (tempo_init, tempo_target))    
+            self.canonical_parent.clyphx_pro_component.trigger_action_list('BPM %s' % tempo_target )
+        else:
+            self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/ARM ON' % int(idx_bpm_ctrl_track+1) )
+            self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PLAY %s' % (int(idx_bpm_ctrl_track+1),int(idx_dummy_slot+1)))
+            
+
+
+
+        
 
     def set_tinypad_configuration(self, action_def, arg):
         """as transport buttons are not supported for button binding in clyphx, this function changes the name of xclips with transport button functions depending on argument"""
@@ -251,9 +285,9 @@ class ExampleActions(UserActionsBase):
         tiny_notes_track=tracks[idx_tiny_notes_track]
         if arg == "0" :
             tiny_transport_track.clip_slots[0].clip.name="[] 1/CLIP(1) DEL"
-            tiny_transport_track.clip_slots[1].clip.name="[] navigate_tracks"
+            tiny_transport_track.clip_slots[1].clip.name='[] "Beats"/SEL'
             tiny_transport_track.clip_slots[2].clip.name="[] navigate_clips"
-            tiny_transport_track.clip_slots[3].clip.name="SOME MACRO FUNCTION"
+            tiny_transport_track.clip_slots[3].clip.name='[] (PSEQ) "Voix"/ARM ON ; "Voix"/ARM OFF'
             tiny_transport_track.clip_slots[4].clip.name='[] "piano"/SEL ; "piano"/plugin_preset_change'
             tiny_transport_track.clip_slots[5].clip.name="[] switch_armed_instru"
             # ----
@@ -263,7 +297,7 @@ class ExampleActions(UserActionsBase):
             tiny_notes_track.clip_slots[3].clip.name="[] dec_bpm_from_loop_arg 2"
             tiny_notes_track.clip_slots[4].clip.name="[] inc_binklooper_beats"
             tiny_notes_track.clip_slots[5].clip.name="[] dec_binklooper_beats"
-            tiny_notes_track.clip_slots[6].clip.name='[] "REC"/tosimp'
+            tiny_notes_track.clip_slots[6].clip.name='[] "piano"/PLAY 7'
             tiny_notes_track.clip_slots[7].clip.name="[] autoset_binklooper_beats"
             tiny_notes_track.clip_slots[8].clip.name="[] SEL/send_beat_to_main_scene"
             tiny_notes_track.clip_slots[9].clip.name="[] (PSEQ) bind_instru ; bind_global ; bind_specific"
@@ -377,18 +411,19 @@ class ExampleActions(UserActionsBase):
         self.canonical_parent.show_message('idx instru armed : %s' % idx_armed_instru) 
         # Disarm current armed instru track and arms the next instru track (or arms the 1st instru track if the current armed track is the last instru)
         tracks[idx_armed_instru[0]].arm = False
-        if idx_armed_instru[0]+1 <= max(idx_instru_tracks):
+        if idx_armed_instru[0]+1 <= max(idx_instru_tracks) and tracks[idx_armed_instru[0]+1].name is not "voix": # TO BE CHANGED
               tracks[idx_armed_instru[0]+1].arm = True
         else:
               tracks[idx_instru_tracks[0]].arm = True
 
 
     def reset_instru_tracks(self, action_def, _):
-        """deleted all tracks from INSTRU group excepted piano"""
+        """deleted all tracks from INSTRU group excepted piano and bass track"""
         tracks, idx_instru_group, idx_instru_tracks = [self.initialize_variables()[i] for i in (0,7,8)]
         for i in range(len(idx_instru_tracks)-2):
               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/DEL' % int(idx_instru_tracks[-1-i]+1) )
         self.canonical_parent.clyphx_pro_component.trigger_action_list('"piano"/ARM ON')
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('"basse"/ARM ON')
       # 
     def set_last_simpler_track(self, action_def, _):
         """use set_simpler_slice on the most recent TOSIMP track"""
@@ -484,19 +519,7 @@ class ExampleActions(UserActionsBase):
       # -------------------- modify routing clip name ---------------   
         list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "1"  
         self.canonical_parent.show_message('%s' % routing_clip_name)             
-          
-
-#     def reset_initial_routing(self, action_def, _):
-#         """Rec track in : piano, out : master. Same for loopers. Monitor off for all"""
-#         tracks, idx_loop_tracks, routing_clip_name = [self.initialize_variables()[i] for i in (0,1,6)]
-#         for i in range(len(idx_loop_tracks)):
-#               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/IN "INSTRU"; %s/OUT "Master"; %s/MON OFF; %s/ARM ON' % (int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1),int(idx_loop_tracks[i]+1)) )
-#               tracks[idx_loop_tracks[i]].mute=False 
-#         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "INSTRU"; 1/OUT "Master"; WAIT 5; 1/MON OFF; 1/ARM ON' )
-#         self.canonical_parent.clyphx_pro_component.trigger_action_list('"piano"/ARM ON' )
-#         # -------------------- modify routing clip name ---------------          
-#         list(tracks[0].clip_slots)[-2].clip.name = routing_clip_name[0:-1] + "0"  
-#         self.canonical_parent.show_message('%s' % routing_clip_name)     
+           
         
     def reset_initial_routing(self, action_def, _):
         """Rec track in : piano, out : master. Same for loopers. Monitor off for all"""
@@ -602,18 +625,20 @@ class ExampleActions(UserActionsBase):
               self.canonical_parent.show_message('wrong argument, need 1 or 2' )   
     
     def increase_bpm_from_loop_arg(self, action_def, args):
-        """ increases by 1 the beat numbers of bpm_from_loop argument or the measures number. if args = 1, measure number, if args = 2, beat numbers """              
+        """ increases by 1 the beat numbers of bpm_from_loop argument or the measures number. if args = 1, measure number, if args = 2, beat numbers """ 
         tracks=list(self.song().tracks)
         idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0] 
         init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
       #   base_name="[] SEL/bpm_from_loop_new " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
         base_name=init_clip_name[0:-3]
+      #   self.canonical_parent.show_message('base name %s' % base_name )               
+
         length_arg=len(init_clip_name)-len(base_name)
         str_bpm_arg = init_clip_name[-length_arg:]
         list_bpm_arg=str_bpm_arg.split(' ')
         meas_arg = int(list_bpm_arg[0])
         time_arg=int(list_bpm_arg[1])
-        self.canonical_parent.show_message('coucou' )   
+      #   self.canonical_parent.show_message('coucou' )   
         if int(args) == 1: # modify measure numbers
               if meas_arg < 8:
                     meas_arg = meas_arg+1
@@ -622,10 +647,10 @@ class ExampleActions(UserActionsBase):
               self.canonical_parent.show_message('new meas arg %s' % meas_arg) 
               list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + str(meas_arg) + ' ' + list_bpm_arg[1]
         elif int(args) == 2: # modify beat numbers
-              if time_arg < 11:
+              if time_arg < 9:
                     time_arg = time_arg+1
               else:
-                    time_arg=11
+                    time_arg=9
               self.canonical_parent.show_message('new time arg %s' % time_arg) 
               list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + list_bpm_arg[0] + ' ' + str(time_arg)
         else:
