@@ -196,8 +196,10 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('navigate_beat', self.set_next_beat_to_first_scene)
         self.add_global_action('tiny_config', self.set_tinypad_configuration)
         self.add_global_action('bpm_1bar_clip', self.set_bpm_from_1bar_clip)
+        self.add_global_action('adjust_length_beatmidi', self.adjust_length_beatmidi)
+        self.add_global_action('switch_beatmidi', self.switch_beatmidi)
 
-      #   self.add_global_action('see_looper_param', self.see_looper_param)
+      #   Create function to warp / unwarp all simplers of a (drum)rack
 
 
 
@@ -218,6 +220,7 @@ class ExampleActions(UserActionsBase):
         11: idx_loops_out_track
         12 : idx_beats_group
         13 : idx_bpm_ctrl_track
+        14 : live sample frames parameter
         """
         tracks=list(self.song().tracks)
         idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
@@ -233,7 +236,9 @@ class ExampleActions(UserActionsBase):
         idx_sel_track = tracks.index(sel_track)
         idx_loops_out_track = [i for i in range(len(tracks)) if "LOOPS_OUT" in tracks[i].name][0]
         idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0]
-        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track
+        live_sample_frames = 44100 # CAN BE CHANGED
+        names_beats_midi = ['beatardeche',"FunkyClyphX","beatrebou"] # parts of chain simpler names in beats midi drumracks !! NO CAPITAL LETTER IN NAMESBEATS
+        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi
 # ----------- END OF INITIALIZING FUNCTION ---------------------
 
 #     def see_looper_param(self, action_def, _):
@@ -247,6 +252,136 @@ class ExampleActions(UserActionsBase):
 #         param_names = [looper_parameters[i].name for i in range(len(looper_parameters))]
 #         self.canonical_parent.show_message('param names %s' % param_names ) 
 
+    def switch_beatmidi(self, action_def, args):
+        """all beats / fills / SC are loaded in big drmrcks. this function transposes midi notes to trigger new beat groups in the drum racks. beat base name can be specified in args"""
+        tracks, names_beats_midi = [self.initialize_variables()[i] for i in (0,15)]
+        idx_track_beatsmidi = [i for i in range(len(tracks)) if "beatsMidi" in tracks[i].name][0]
+        track_beatsmidi = tracks[idx_track_beatsmidi]
+        idx_track_fillsmidi = [i for i in range(len(tracks)) if "fillsMidi" in tracks[i].name][0]
+        track_fillsmidi = tracks[idx_track_fillsmidi]
+        idx_track_SCsmidi = [i for i in range(len(tracks)) if "SCMidi" in tracks[i].name][0]
+        track_SCmidi = tracks[idx_track_SCsmidi]
+        all_tracks_midi = [track_beatsmidi,track_fillsmidi,track_SCmidi]
+        all_idx_midi=[idx_track_beatsmidi,idx_track_fillsmidi,idx_track_SCsmidi]
+        self.canonical_parent.show_message('names beatsmidi : %s' % names_beats_midi)
+         # --------------- find current beat base name ----------- AJOUTER TESTS ARGS
+        beatsmidi_slots=list(track_beatsmidi.clip_slots)
+        self.canonical_parent.show_message('beatsmidislot : %s ' % (beatsmidi_slots))
+        currentbeat_slot = [beatsmidi_slots[i] for i in range(len(beatsmidi_slots)) if beatsmidi_slots[i].has_clip and "CurrentBeat" in beatsmidi_slots[i].clip.name][0] # "CurrentBeat" in beatsmidi_slots[i].clip.name]
+        self.canonical_parent.show_message('currentbeatslot : %s ' % (currentbeat_slot))
+        current_beat_name=currentbeat_slot.clip.name.split(' : ')[1]
+        self.canonical_parent.show_message('current_beat_name : %s ' % (current_beat_name))
+        idx_currentbeat = [i for i in range(len(names_beats_midi)) if current_beat_name in names_beats_midi[i]][0]
+        idx_argsbeat = [i for i in range(len(names_beats_midi)) if args in names_beats_midi[i]][0]
+        # ---------------- get samples names --------------
+        for j in range(len(all_tracks_midi)):
+              # --------------- find first occurence of base name in samples names -----------
+              devices = list(all_tracks_midi[j].devices)
+              self.canonical_parent.show_message('midi beat devices : %s ' % (devices))
+              idx_drumrack = [z for z in range(len(devices)) if devices[z].can_have_drum_pads][0]
+              idx_pitchdev = [z for z in range(len(devices)) if "Pitch" in devices[z].name][0]
+              drmrck=devices[idx_drumrack]
+              chains=list(drmrck.chains)
+              self.canonical_parent.show_message(' drmrck chain device : %s ' % (list(chains[0].devices)[0]))
+              # ----------- For Later : instead of increasing pitch by 4 all the time, might adapt to number of samples in each beat ---------
+            #   chains_with_currentbeat=[]
+            #   for i in range(len(chains)):
+            #         if len(list(chains[i].devices)) > 0:
+            #               simpler_dev = list(chains[i].devices)[0]
+            #               if current_beat_name in chains[i].name: # For later : Try to stop loop as soon as other base beat names arrives ?
+            #                     chains_with_currentbeat.append(chains[i])
+            #         else:
+            #               chains_with_currentbeat.append(chains[i]) # If no device on chain, still count it to increase the pitch of midi note
+            #   self.canonical_parent.show_message('len chainswithcurrentbeat : %s ' % len(chains_with_currentbeat))
+              # --------------- transpose midi notes according to first occurence position -------------
+              param_pitch = devices[idx_pitchdev].parameters
+              param_pitch_names=[param_pitch[z].name for z in range(len(param_pitch))]
+              idx_param_pitch_pitch = [z for z in range(len(param_pitch)) if "Pitch" in param_pitch[z].name][0]
+              if args and args in names_beats_midi:
+                    param_pitch[idx_param_pitch_pitch].value += (idx_argsbeat-idx_currentbeat)*4
+              else:
+                    if idx_currentbeat < len(names_beats_midi)-1:
+                        #   param_pitch[idx_param_pitch_pitch].value += len(chains_with_currentbeat) # Complex version
+                          param_pitch[idx_param_pitch_pitch].value += 4
+                    else:
+                          param_pitch[idx_param_pitch_pitch].value = 0
+              self.canonical_parent.show_message('param pitch %s' % param_pitch[idx_param_pitch_pitch].value)
+        # --------------- Over write CurrentBeat name --------------
+        if args and args in names_beats_midi:
+                    currentbeat_slot.clip.name=currentbeat_slot.clip.name.split(' : ')[0] + ' : ' + names_beats_midi[idx_argsbeat]
+        else:
+              if idx_currentbeat < len(names_beats_midi)-1:
+                    currentbeat_slot.clip.name=currentbeat_slot.clip.name.split(' : ')[0] + ' : ' + names_beats_midi[idx_currentbeat+1]
+              else:
+                    currentbeat_slot.clip.name=currentbeat_slot.clip.name.split(' : ')[0] + ' : ' + names_beats_midi[0]
+
+        # ------------- Tests -----------
+        if not args :
+              self.canonical_parent.show_message('no args' )
+        elif args and args not in names_beats_midi:
+              self.canonical_parent.show_message('args : %s not in names beats midi' % args )
+        else:
+              self.canonical_parent.show_message('args : %s' % args )
+      #   self.canonical_parent.show_message('idx args : %s idx current : %s' % (idx_argsbeat,idx_currentbeat) )
+      #   self.canonical_parent.show_message('idx current beat : %s ' % idx_currentbeat)
+      #   self.canonical_parent.show_message('idxdrumrack : %s idxpitch : %s ' % (idx_drumrack, idx_pitchdev))
+      #   self.canonical_parent.show_message('idx param pitch : %s ' % idx_param_pitch_pitch)
+
+
+
+      
+    def adjust_length_beatmidi(self, action_def, _):
+        """sets length of midi clip according to length of corresponding sample in the beat drum rack and in the fill drum rack"""
+        tracks, idx_beats_group, live_sample_frames = [self.initialize_variables()[i] for i in (0,12, 14)]
+        idx_track_beatsmidi = [i for i in range(len(tracks)) if "beatsMidi" in tracks[i].name][0]
+        track_beatsmidi = tracks[idx_track_beatsmidi]
+        idx_track_fillsmidi = [i for i in range(len(tracks)) if "fillsMidi" in tracks[i].name][0]
+        track_fillsmidi = tracks[idx_track_fillsmidi]
+        idx_track_SCsmidi = [i for i in range(len(tracks)) if "SCMidi" in tracks[i].name][0]
+        track_SCsmidi = tracks[idx_track_SCsmidi]
+        all_tracks_midi = [track_beatsmidi,track_fillsmidi]
+        all_idx_midi=[idx_track_beatsmidi,idx_track_fillsmidi]
+        # Loop for each midi track
+        for j in range(len(all_tracks_midi)):
+               # ------------ GET LENGTH for each sample -------------
+              devices = list(all_tracks_midi[j].devices)
+              self.canonical_parent.show_message('midi beat devices : %s ' % (devices))
+              drmrck=devices[0]
+              chains=list(drmrck.chains)
+              self.canonical_parent.show_message(' drmrck chains : %s ' % (len(chains)))
+              len_samples=[]
+              for i in range(len(chains)):
+                    # len_samples.append(list(chains[i].devices)[0].sample.length)/float(live_sample_frames)
+                    raw_len = list(chains[i].devices)[0].sample.length # unit Frames
+                    converted_len = raw_len / float(live_sample_frames)*float(self.song().tempo)/60 
+                    len_samples.append(converted_len)
+              self.canonical_parent.show_message('raw len %s sampleframe %s tempo %s converted %s' % (raw_len,live_sample_frames,self.song().tempo, converted_len) )
+              self.canonical_parent.show_message('converted %s' % (len_samples) )
+              # ------ ADD TEST WITH DEVICES[0].NAME IN CASE IT IS NOT A DRUMRACK DEVICE ------
+              # ------------ SET LENGTH of each midi clip to corresponding sample ==== >> !!!!! CHEATED VERSION TO BE CHANGED !!!!!! << =======
+              # ===================================
+              #   cheat_lengths = [4,8,16,32,64]
+              cheat_factor = 8/8.707507936507938
+              len_samples=[len_samples[z]*cheat_factor for z in range(len(len_samples))]
+              self.canonical_parent.show_message('kikou allidx= %s, j = %s, track = %s, len_samples %s ' % (all_idx_midi,j,all_tracks_midi[j].name,len_samples))
+              # ===================================
+              clipslots=list(all_tracks_midi[j].clip_slots)
+              cliplengths=[]        
+              for i in range(len(len_samples)):
+                    
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) START 0' % (int(all_idx_midi[j]+1), int(i+1)))
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) LOOP START 0' % (int(all_idx_midi[j]+1), int(i+1)))
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) LOOP RESET' % (int(all_idx_midi[j]+1), int(i+1)))
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) LOOP END %s' % (int(all_idx_midi[j]+1), int(i+1),len_samples[i]))
+                    # ---------- assumption : drum rack pads start at C1 = number 36 -----------
+                    clipslots[i].clip.set_notes(((int(36+i),0,clipslots[i].clip.length,100,False),))
+              self.canonical_parent.show_message('finito. len_samples %s ' % (len_samples))
+
+               
+            
+                  
+
+       
     def set_bpm_from_1bar_clip(self, action_def, _):
         """1 click : rec empty midi clip. 2nd click : stops rec, set bpm from midi clip length (1 bar)"""
         tracks, idx_bpm_ctrl_track = [self.initialize_variables()[i] for i in (0,13)]
@@ -628,10 +763,11 @@ class ExampleActions(UserActionsBase):
         """ increases by 1 the beat numbers of bpm_from_loop argument or the measures number. if args = 1, measure number, if args = 2, beat numbers """ 
         tracks=list(self.song().tracks)
         idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0] 
+        self.canonical_parent.show_message('bpm track idx %s' % idx_bpm_ctrl_track )    
         init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
       #   base_name="[] SEL/bpm_from_loop_new " # MIGHT CHANGE IF BPM FROM LOOP FUNCTION CHANGES
         base_name=init_clip_name[0:-3]
-      #   self.canonical_parent.show_message('base name %s' % base_name )               
+        self.canonical_parent.show_message('base name %s' % base_name )               
 
         length_arg=len(init_clip_name)-len(base_name)
         str_bpm_arg = init_clip_name[-length_arg:]
