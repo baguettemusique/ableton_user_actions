@@ -198,6 +198,8 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('bpm_1bar_clip', self.set_bpm_from_1bar_clip)
         self.add_global_action('adjust_length_beatmidi', self.adjust_length_beatmidi)
         self.add_global_action('switch_beatmidi', self.switch_beatmidi)
+        self.add_global_action('adjust_length_loopclips', self.adjust_length_loopclips)
+
 
       #   Create function to warp / unwarp all simplers of a (drum)rack
 
@@ -221,6 +223,8 @@ class ExampleActions(UserActionsBase):
         12 : idx_beats_group
         13 : idx_bpm_ctrl_track
         14 : live sample frames parameter
+        15 : names_beats_midi
+        16 : idx_cmdloop_tracks
         """
         tracks=list(self.song().tracks)
         idx_loop_tracks = [i for i in range(len(tracks)) if "Loop" in tracks[i].name]
@@ -238,7 +242,8 @@ class ExampleActions(UserActionsBase):
         idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0]
         live_sample_frames = 44100 # CAN BE CHANGED
         names_beats_midi = ['beatardeche',"FunkyClyphX","beatrebou"] # parts of chain simpler names in beats midi drumracks !! NO CAPITAL LETTER IN NAMESBEATS
-        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi
+        idx_cmdloop_tracks = [i for i in range(len(tracks)) if "CmdLoop" in tracks[i].name]
+        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks
 # ----------- END OF INITIALIZING FUNCTION ---------------------
 
 #     def see_looper_param(self, action_def, _):
@@ -251,6 +256,34 @@ class ExampleActions(UserActionsBase):
 #         looper_parameters=list(looper_device.parameters)
 #         param_names = [looper_parameters[i].name for i in range(len(looper_parameters))]
 #         self.canonical_parent.show_message('param names %s' % param_names ) 
+
+            
+
+    def adjust_length_loopclips(self, action_def, args):
+        """like auto adjust binklooper but with multilooper config"""
+        tracks, idx_bpm_ctrl_track, idx_cmdloop_tracks = [self.initialize_variables()[i] for i in (0,13,16)]
+        init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
+        list_bpm_arg=init_clip_name.split(' ')
+        beat_arg=int(list_bpm_arg[-1])
+        meas_arg=int(list_bpm_arg[-2])
+        self.canonical_parent.show_message('idx cmdlooptracks %s' % idx_cmdloop_tracks)
+        for i in range(len(idx_cmdloop_tracks)):
+              idx = idx_cmdloop_tracks[i]
+              track_cmd = tracks[idx]
+              clip_cmd = list(track_cmd.clip_slots)[0].clip
+              new_length = beat_arg*meas_arg
+              #   new_length = 32
+              #   clip_cmd.start_marker = 0
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/CLIP(1) LOOP START 0' % int(idx+1))
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/CLIP(1) LOOP END %s' % (int(idx+1), new_length))
+        self.canonical_parent.show_message('new meas/beat : %s/%s looplength : %s' % (meas_arg, beat_arg, float(beat_arg)*meas_arg))
+        bpm_clip = list(tracks[0].clip_slots)[-4].clip
+        init_bpm_name = bpm_clip.name
+        name_splitted = init_bpm_name.split(' ')
+        new_bpm_name = name_splitted[0] + ' ' + str(meas_arg) + ' ' + str(beat_arg)
+        bpm_clip.name = new_bpm_name
+
+
 
     def switch_beatmidi(self, action_def, args):
         """all beats / fills / SC are loaded in big drmrcks. this function transposes midi notes to trigger new beat groups in the drum racks. beat base name can be specified in args"""
@@ -314,6 +347,7 @@ class ExampleActions(UserActionsBase):
                     currentbeat_slot.clip.name=currentbeat_slot.clip.name.split(' : ')[0] + ' : ' + names_beats_midi[idx_currentbeat+1]
               else:
                     currentbeat_slot.clip.name=currentbeat_slot.clip.name.split(' : ')[0] + ' : ' + names_beats_midi[0]
+        # --------- NEED ADJUST CLIP MIDI ACCORDING TO THE NOTE + PITCH ADDED
 
         # ------------- Tests -----------
         if not args :
@@ -890,7 +924,6 @@ class ExampleActions(UserActionsBase):
         track_bink=list(self.song().tracks)[0]
         param_bink=list(track_bink.devices)[0].parameters
         idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0] 
-        self.canonical_parent.show_message('kikou' )
         init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
         list_bpm_arg=init_clip_name.split(' ')
         beat_arg=int(list_bpm_arg[-2])
@@ -1008,13 +1041,16 @@ class ExampleActions(UserActionsBase):
         clipslots = list(sel_track.clip_slots)
         idx_clipslots_full = [i for i in range(len(clipslots)) if clipslots[i].has_clip]
         bool_clipwasplaying=[]
-        if len(idx_clipslots_full) > 0 and "Loop" in sel_track.name :
+        if len(idx_clipslots_full) > 0 :
               # ----------- stop measure clips ----------
               for i in range(len(idx_loop_tracks)):
                     bool_clipwasplaying.append(bool(list(tracks[idx_measure_tracks[i]].clip_slots)[0].is_playing))
                     self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP' % (int(idx_measure_tracks[i]+1)))
              #  --------------  get current bpm and calculate target bpm -----------------
-              length_init = list(tracks[idx_sel_track+nb_loop_tracks].clip_slots)[0].clip.length # initial length based on corresponding measure length
+              if "REC" in sel_track.name:
+                    length_init = list(sel_track.clip_slots)[0].clip.length
+              elif "Loop" in sel_track.name:
+                    length_init = list(tracks[idx_sel_track+nb_loop_tracks].clip_slots)[0].clip.length # initial length based on corresponding measure length
               length_target = float(args[0])*float(args[1])  
               tempo_init = self.song().tempo
               odd_measures = [3,5,6,7,9,10,11] #List of args that will take into account time sig change
