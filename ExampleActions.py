@@ -261,7 +261,7 @@ class ExampleActions(UserActionsBase):
         idx_loops_out_track = [i for i in range(len(tracks)) if "LOOPS_OUT" in tracks[i].name][0]
         idx_bpm_ctrl_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0]
         live_sample_frames = 44100 # CAN BE CHANGED
-        names_beats_midi = ['beatardeche',"FunkyClyphX","beatrebou"] # parts of chain simpler names in beats midi drumracks !! NO CAPITAL LETTER IN NAMESBEATS
+        names_beats_midi = ['beatardeche',"FunkyClyphX","beatrebou","ThugBeat"] # parts of chain simpler names in beats midi drumracks !! NO CAPITAL LETTER IN NAMESBEATS
         idx_cmdloop_tracks = [i for i in range(len(tracks)) if "CmdLoop" in tracks[i].name]
         idx_recloop_track=[i for i in range(len(tracks)) if "RECLOOP" in tracks[i].name][0]
         return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track
@@ -454,8 +454,8 @@ class ExampleActions(UserActionsBase):
         all_tracks_midi = [track_beatsmidi,track_fillsmidi]
         all_idx_midi=[idx_track_beatsmidi,idx_track_fillsmidi]
         # Loop for each midi track
-      #   for j in range(len(all_tracks_midi)):
-        for j in range(1):
+        for j in range(len(all_tracks_midi)):
+      #   for j in range(1):
                # ------------ GET LENGTH for each sample -------------
               devices = list(all_tracks_midi[j].devices)
             #   self.canonical_parent.show_message('midi beat devices : %s ' % (devices))
