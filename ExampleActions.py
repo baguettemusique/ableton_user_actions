@@ -218,6 +218,8 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('adjust_length_loopclips_new', self.adjust_length_loopclips_new)
         self.add_global_action('switch_rec_free_sync', self.switch_rec_free_sync)
         self.add_global_action('play_recloop', self.play_recloop)
+        self.add_global_action('qtzornot_loopers', self.qtzornot_loopers)
+
 
 
 
@@ -266,6 +268,18 @@ class ExampleActions(UserActionsBase):
         idx_recloop_track=[i for i in range(len(tracks)) if "RECLOOP" in tracks[i].name][0]
         return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track
 # ----------- END OF INITIALIZING FUNCTION ---------------------
+
+
+    def qtzornot_loopers(self, action_def, _): 
+        """switches between quantized or not quantized clips"""
+        self.canonical_parent.show_message('coucou0')
+
+        tracks, idx_cmdloop_tracks = [self.initialize_variables()[i] for i in (0,16)]
+        self.canonical_parent.show_message('coucou')
+        for i in range(len(idx_cmdloop_tracks)):
+              idx = int(idx_cmdloop_tracks[i] + 1) 
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP 10 ; %s/PASTECLIP 9 ; %s/COPYCLIP 1 ; %s/PASTECLIP 10 ; %s/COPYCLIP 9 ; %s/PASTECLIP 1' % (idx,idx,idx,idx,idx,idx))
+   
 
     def play_recloop(self, action_def, _): # A TESTER
         """plays first recloop clip and stops loopers if it is the second time this function is used"""
@@ -988,6 +1002,8 @@ class ExampleActions(UserActionsBase):
                     self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) LOOP START 0 ; %s/CLIP(1) LOOP END %.2f' % (int(idx_measure_tracks[i]+1),int(idx_measure_tracks[i]+1),cliplength_target))       
                   #   if bool_clipwasplaying[i]:
                         #   self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PLAY 1' % (int(idx_measure_tracks[i]+1)))
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('RESTART')       
+
         else:
             self.canonical_parent.show_message('No clip in Loop track or wrong track selected')
        #------- write which clips where playing in clip name --------
@@ -998,7 +1014,7 @@ class ExampleActions(UserActionsBase):
         if naming_clip.has_clip is False:
               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/ADDCLIP %s' % (int(idx_bpm_track+1),int(nb_bpm_clipslots-1)))
         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) NAME "%s"' % (int(idx_bpm_track+1),int(nb_bpm_clipslots-1),name_bool_int))
-      
+        
 
     def get_clip_length(self, action_def, _): 
         """ prints clip length """
