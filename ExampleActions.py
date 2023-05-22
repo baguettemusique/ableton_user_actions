@@ -219,6 +219,7 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('switch_rec_free_sync', self.switch_rec_free_sync)
         self.add_global_action('play_recloop', self.play_recloop)
         self.add_global_action('qtzornot_loopers', self.qtzornot_loopers)
+        self.add_global_action('reset_routing_new', self.reset_routing_new)
 
 
 
@@ -269,11 +270,18 @@ class ExampleActions(UserActionsBase):
         return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track
 # ----------- END OF INITIALIZING FUNCTION ---------------------
 
+    def reset_routing_new(self, action_def, _): 
+        """arms right tracks in case wrong manipulation has been made : unarms all, then arms REC (and mute it) and arms first track of Instru Group"""
+        idx_instru_group = self.initialize_variables()[7]
+        self.canonical_parent.show_message('coucou0')
+
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('all/ARM OFF')
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "INSTRU" ; 1/OUT "Master" ; WAIT 5 ; 1/MON AUTO ; 1/ARM ON ; 1/MUTE ON')
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/ARM ON' % int(idx_instru_group+2))
+
 
     def qtzornot_loopers(self, action_def, _): 
         """switches between quantized or not quantized clips"""
-        self.canonical_parent.show_message('coucou0')
-
         tracks, idx_cmdloop_tracks = [self.initialize_variables()[i] for i in (0,16)]
         self.canonical_parent.show_message('coucou')
         for i in range(len(idx_cmdloop_tracks)):
@@ -660,7 +668,7 @@ class ExampleActions(UserActionsBase):
                           tracks[idx_loop_tracks[i]].mute=True 
       # ---------- Play Rec clip ------------
         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/PLAY 1')
-        
+      
 
     def reset_looper_tracks(self, action_def, _):
         """clear loop clips"""
@@ -969,52 +977,28 @@ class ExampleActions(UserActionsBase):
         idx_clipslots_full = [i for i in range(len(clipslots)) if clipslots[i].has_clip]
         bool_clipwasplaying=[]
         if len(idx_clipslots_full) > 0 :
-              # ----------- stop measure clips ----------
-              for i in range(len(idx_loop_tracks)):
-                    bool_clipwasplaying.append(bool(list(tracks[idx_measure_tracks[i]].clip_slots)[0].is_playing))
-                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/STOP' % (int(idx_measure_tracks[i]+1)))
              #  --------------  get current bpm and calculate target bpm -----------------
               if "REC" in sel_track.name:
                     length_init = list(sel_track.clip_slots)[0].clip.length
-              elif "Loop" in sel_track.name:
-                    length_init = list(tracks[idx_sel_track+nb_loop_tracks].clip_slots)[0].clip.length # initial length based on corresponding measure length
               length_target = float(args[0])*float(args[1])  
               tempo_init = self.song().tempo
-              odd_measures = [3,5,6,7,9,10,11] #List of args that will take into account time sig change
-              if length_target in odd_measures:
-                  #   time_sig_factor = 4/length_target # !!!!!!!! CA VA PAS CE FACTEUR !!!!!!!!!
-                    time_sig_factor = 1 
-              else:
-                    time_sig_factor = 1              
-              ratio_length_generic = length_target/length_init*time_sig_factor # can be used for all measure clips and for bpm
+            #   odd_measures = [3,5,6,7,9,10,11] #List of args that will take into account time sig change
+            #   if length_target in odd_measures:
+            #       #   time_sig_factor = 4/length_target # !!!!!!!! CA VA PAS CE FACTEUR !!!!!!!!!
+            #         time_sig_factor = 1 
+            #   else:
+            #         time_sig_factor = 1              
+              ratio_length_generic = length_target/length_init # can be used for all measure clips and for bpm
               tempo_target = tempo_init*ratio_length_generic
-              self.canonical_parent.show_message('ancient BPM %s new BPM %s' % (tempo_init, tempo_target))    
+              self.canonical_parent.show_message('ancient length %s target length %s' % (length_init, length_target))    
+            #   self.canonical_parent.show_message('ancient BPM %s new BPM %s' % (tempo_init, tempo_target))    
             #  --------------  Change bpm -----------------
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('BPM %s' % tempo_target )
-
-              # -------------------- adjusts length of Measure clips corresponding to existing Loop clips and relaunches them if previously playing ---------------
-              for i in range(len(idx_loop_tracks)):
-                    cliplength_init = tracks[idx_measure_tracks[i]].clip_slots[0].clip.length
-                    if idx_loop_tracks[i] == idx_sel_track:
-                          cliplength_target = length_target
-                    else:
-                          cliplength_target = cliplength_init*ratio_length_generic
-                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) LOOP START 0 ; %s/CLIP(1) LOOP END %.2f' % (int(idx_measure_tracks[i]+1),int(idx_measure_tracks[i]+1),cliplength_target))       
-                  #   if bool_clipwasplaying[i]:
-                        #   self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PLAY 1' % (int(idx_measure_tracks[i]+1)))
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('RESTART')       
-
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('BPM %s' % tempo_target ) 
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('1/CLIP(1) START 0 ; 1/CLIP(1) END %s' % length_target ) 
+                 
         else:
             self.canonical_parent.show_message('No clip in Loop track or wrong track selected')
-       #------- write which clips where playing in clip name --------
-        idx_bpm_track = [i for i in range(len(tracks)) if "bpm" in tracks[i].name][0]
-        nb_bpm_clipslots = len(list(tracks[idx_bpm_track].clip_slots))
-        naming_clip = list(tracks[idx_bpm_track].clip_slots)[-2]
-        name_bool_int = [int(bool_clipwasplaying[i]) for i in range(len(bool_clipwasplaying))]
-        if naming_clip.has_clip is False:
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/ADDCLIP %s' % (int(idx_bpm_track+1),int(nb_bpm_clipslots-1)))
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) NAME "%s"' % (int(idx_bpm_track+1),int(nb_bpm_clipslots-1),name_bool_int))
-        
+     
 
     def get_clip_length(self, action_def, _): 
         """ prints clip length """
