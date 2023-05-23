@@ -220,6 +220,7 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('play_recloop', self.play_recloop)
         self.add_global_action('qtzornot_loopers', self.qtzornot_loopers)
         self.add_global_action('reset_routing_new', self.reset_routing_new)
+        self.add_track_action('new_beats_fromdump', self.new_beats_from_dump)
 
 
 
@@ -248,6 +249,7 @@ class ExampleActions(UserActionsBase):
         15 : names_beats_midi
         16 : idx_cmdloop_tracks
         17 : idx_recloop_track
+        18 : idx_dump_group
         """
         tracks=list(self.song().tracks)
         idx_loop_tracks = [i for i in range(len(tracks)) if "Looper" in tracks[i].name]
@@ -267,9 +269,40 @@ class ExampleActions(UserActionsBase):
         names_beats_midi = ['beatardeche',"FunkyClyphX","beatrebou","ThugBeat"] # parts of chain simpler names in beats midi drumracks !! NO CAPITAL LETTER IN NAMESBEATS
         idx_cmdloop_tracks = [i for i in range(len(tracks)) if "CmdLoop" in tracks[i].name]
         idx_recloop_track=[i for i in range(len(tracks)) if "RECLOOP" in tracks[i].name][0]
-        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track
+        idx_dump_group=[i for i in range(len(tracks)) if "DUMP" in tracks[i].name][0]
+
+        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track, idx_dump_group
 # ----------- END OF INITIALIZING FUNCTION ---------------------
 
+    def new_beats_from_dump(self, action_def, _): 
+        """copy beats, SC, and fills from DUMP group and pastes it to effective beatGroup"""
+        tracks, idx_beats_group, idx_dumpgroup = [self.initialize_variables()[i] for i in (0,12,18)]
+        # --------- read Dump info clip to know which scenes to copy in the dump group ----------
+        # ---------- CAREFULL: DUMP INFO CLIP MUST BE IN SAME TRACK AS THE CURRENT USER ACTION CLIP -----------
+        track = action_def['track']   
+        track_idx = list(self.song().tracks).index(action_def['track']) 
+        track_clipslots = list(track.clip_slots)
+        idx_dmpinfo = [i for i in range(len(track_clipslots)) if track_clipslots[i].has_clip and "DMPINFO" in track_clipslots[i].clip.name][0]
+        dmpinfo_name = track_clipslots[idx_dmpinfo].clip.name
+        dmpinfo_split = dmpinfo_name.split(' ')
+        dmpinfo_split_last = int(dmpinfo_split[-1])
+        idx_scenes_dump = [i+(dmpinfo_split_last-1)*8 for i in range(8)]
+      #   self.canonical_parent.show_message('idx_scenes_dump : %s' % idx_scenes_dump)
+        # --------- copy and paste clips from dump to effective beatgroup ---------
+        idx_copy = [idx_dumpgroup+1, idx_dumpgroup+2, idx_dumpgroup+3]
+        idx_paste = [idx_beats_group+1, idx_beats_group+2, idx_beats_group+3]
+        for i in range(len(idx_copy)):
+              for j in range(len(idx_scenes_dump)):
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP %s' % (int(idx_copy[i]+1),int(idx_scenes_dump[j]+1)))
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PASTECLIP %s' % (int(idx_paste[i]+1),int(j+1)))
+      #   ------------ rename Dump info clip : CAREFULL: DUMP INFO CLIP MUST BE IN SAME TRACK AS THE CURRENT USER ACTION CLIP  --------------
+        dmpinfo_split_last += 1
+        if dmpinfo_split_last > 3:
+              dmpinfo_split_last = 1
+        track_clipslots[idx_dmpinfo].clip.name = ' '.join(dmpinfo_split[:-1]) + " " + str(dmpinfo_split_last)
+        self.canonical_parent.show_message('8 new beats pasted' )
+
+        
     def reset_routing_new(self, action_def, _): 
         """arms right tracks in case wrong manipulation has been made : unarms all, then arms REC (and mute it) and arms first track of Instru Group"""
         idx_instru_group = self.initialize_variables()[7]
