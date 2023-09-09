@@ -219,15 +219,20 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('switch_rec_free_sync', self.switch_rec_free_sync)
         self.add_global_action('play_recloop', self.play_recloop)
         self.add_global_action('qtzornot_loopers', self.qtzornot_loopers)
+        self.add_global_action('qtzornot_loopers2', self.qtzornot_loopers2)
         self.add_global_action('reset_routing_new', self.reset_routing_new)
         self.add_track_action('new_beats_fromdump', self.new_beats_from_dump)
+        self.add_global_action('duplicate_and_transpose', self.duplicate_and_transpose)
+        self.add_track_action('clip_from_BPMarg', self.create_clip_from_bpm_arg)
+        self.add_track_action('tell_param_names', self.tell_param_names)
+        self.add_track_action('activ_dlo', self.activate_DLo_buttons)
+        self.add_global_action('switch_clear_undo', self.switch_DLobuttons_clear_undo)
+        self.add_track_action('color_sel_looper', self.color_looper_cmd_track)
 
 
 
 
-
-
-
+# ---------- INITIALIZING FUNCTION : DEF ALL USEFULL VARIABLES --------------
 # ---------- INITIALIZING FUNCTION : DEF ALL USEFULL VARIABLES --------------
     def initialize_variables(self):
         """
@@ -259,8 +264,13 @@ class ExampleActions(UserActionsBase):
         idx_measure_tracks_full = [i+nb_loop_tracks for i in idx_loop_full]
         routing_clip_name = list(tracks[0].clip_slots)[-2].clip.name # !!!! ATTENTION l'indice de routing clip name peut changer !!!!
         idx_instru_group = [i for i in range(len(tracks)) if "INSTRU" in tracks[i].name][0] # ATTENTION le nom peut changer
-        idx_beats_group = [i for i in range(len(tracks)) if "GrpBeet" in tracks[i].name][0] # ATTENTION le nom peut changer
-        idx_instru_tracks = [i for i in range(len(tracks)) if i > idx_instru_group and i < idx_beats_group and tracks[i].is_grouped is True] # ATTENTION la def peut changer
+        idx_beats_group = [i for i in range(len(tracks)) if "GrpBeet" in tracks[i].name] # ATTENTION le nom peut changer
+        if len(idx_beats_group) > 0:
+                idx_beats_group = idx_beats_group[0]
+        if len(idx_beats_group) > 0:
+             idx_instru_tracks = [i for i in range(len(tracks)) if i > idx_instru_group and i < idx_beats_group and tracks[i].is_grouped is True] # ATTENTION la def peut changer
+        else:
+             idx_instru_tracks = [i for i in range(len(tracks)) if i > idx_instru_group and tracks[i].is_grouped is True] # ATTENTION la def peut changer
         sel_track = self.song().view.selected_track
         idx_sel_track = tracks.index(sel_track)
         idx_loops_out_track = [i for i in range(len(tracks)) if "LOOPS_OUT" in tracks[i].name][0]
@@ -269,14 +279,146 @@ class ExampleActions(UserActionsBase):
         names_beats_midi = ['beatardeche',"FunkyClyphX","beatrebou","ThugBeat"] # parts of chain simpler names in beats midi drumracks !! NO CAPITAL LETTER IN NAMESBEATS
         idx_cmdloop_tracks = [i for i in range(len(tracks)) if "CmdLoop" in tracks[i].name]
         idx_recloop_track=[i for i in range(len(tracks)) if "RECLOOP" in tracks[i].name][0]
-        idx_dump_group=[i for i in range(len(tracks)) if "DUMP" in tracks[i].name][0]
+        idx_dump_group=[i for i in range(len(tracks)) if "DUMP" in tracks[i].name]
+        if len(idx_dump_group) > 0:
+              idx_dump_group = idx_dump_group[0]
 
         return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track, idx_dump_group
 # ----------- END OF INITIALIZING FUNCTION ---------------------
 
+    def color_looper_cmd_track(self, action_def, args): 
+        """colorizes in bright the command track corresponding to the selected looper""" 
+        self.canonical_parent.show_message('coucou3')
+      #   tracks, idx_cmdloop_tracks = [self.initialize_variables()[i] for i in (0,16)]
+        tracks=list(self.song().tracks)
+        action_track = action_def['track']
+        actiontrack_idx = list(self.song().tracks).index(action_def['track']) 
+        idx_LP_tracks=[i for i in range(len(tracks)) if "LP" in tracks[i].name]
+        for i in range(len(idx_LP_tracks)):
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1-4) COLOR 2' % int(idx_LP_tracks[i]+1))
+        if "LP" in action_track.name and len(args) == 0:
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1-4) COLOR 32' % int(actiontrack_idx+1))
+              self.canonical_parent.show_message('coucoucoucou')
+       
+
+
+
+    def switch_DLobuttons_clear_undo(self, action_def, _): 
+        """activates clear, clear_all, undo, or undo_all buttons from DLo Max Device""" # MARCHE SI DLO CLIPS IN LP1 AND LP2 TRACKS
+        self.canonical_parent.show_message('coucou3')
+      #   tracks, idx_cmdloop_tracks = [self.initialize_variables()[i] for i in (0,16)]
+        tracks=list(self.song().tracks)
+        idx_LP_tracks=[i for i in range(len(tracks)) if "LP" in tracks[i].name]
+        for i in (0,1):
+              LPtrack = tracks[idx_LP_tracks[i]]
+              LPslots = list(LPtrack.clip_slots)
+              self.canonical_parent.show_message('len LPslots %s' % len(LPslots))
+              idx_dloclips = [j for j in range(len(LPslots)) if LPslots[j].has_clip and bool("[clear" in LPslots[j].clip.name or "[undo" in LPslots[j].clip.name)][0]
+              self.canonical_parent.show_message('iddx dlos %s' % idx_dloclips)
+              if "clear" in LPslots[idx_dloclips].clip.name:
+                    LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace("clear","undo")
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('"LP1","LP2"/CLIP(%s) COLOR 40' % int(idx_dloclips+1))
+              elif "undo" in LPslots[idx_dloclips].clip.name:
+                    LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace("undo","clear")
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('"LP1","LP2"/CLIP(%s) COLOR 2' % int(idx_dloclips+1))
+
+    def activate_DLo_buttons(self, action_def, args): 
+        """activates clear, clear_all, undo, or undo_all buttons from DLo Max Device"""
+        action_track = action_def['track']
+        actiontrack_idx = list(self.song().tracks).index(action_def['track']) 
+        devices = list(action_track.devices)
+        param_nb = 0
+        if len(args) == 0:
+              self.canonical_parent.show_message('args problem')
+        if args == 'clear':
+              param_nb = 1
+        elif args == 'clear_all':
+              param_nb = 2
+        elif args == 'undo':
+              param_nb = 6
+        elif args == 'undo_all':
+              param_nb = 7
+        else:
+              self.canonical_parent.show_message('args problem')
+        self.canonical_parent.show_message('coucou3')
+        dlo_dev = devices[0]
+      #   dlo_dev.parameters[param_nb].name
+        self.canonical_parent.show_message('type args : %s' % type(args))
+        self.canonical_parent.show_message(dlo_dev.parameters[param_nb].name)
+        self.canonical_parent.show_message('param value : %s' % dlo_dev.parameters[param_nb].value)
+        dlo_dev.parameters[param_nb].value = True
+
+
+
+    def tell_param_names(self, action_def, args): 
+        """creates clip with meas and beat arg from BPM clip in first track (position [-4])"""
+        action_track = action_def['track']
+        actiontrack_idx = list(self.song().tracks).index(action_def['track']) 
+        devices = list(action_track.devices)
+        idx_device = int(args)
+        interest_device = devices[idx_device]
+        text_names = ''
+        for i in range(len(interest_device.parameters)):
+              text_names += ('P%s : %s / ' % (int(i+1), interest_device.parameters[i].name))
+        self.canonical_parent.show_message(text_names)
+      #   self.canonical_parent.show_message('%s' % interest_device.parameters[1].is_quantized)
+
+    def create_clip_from_bpm_arg(self, action_def, _): 
+        """creates clip with meas and beat arg from BPM clip in first track (position [-4])"""
+        self.canonical_parent.show_message('coucou')
+      #   all_tracks = self.initialize_variables()[0]
+      #   action_track = action_def['track']   
+      #   actiontrack_idx = list(self.song().tracks).index(action_def['track']) 
+      #   bpm_clip = list(all_tracks[0].clip_slots)[-4].clip
+      #   bpmclip_name_split = bpm_clip.name.split(' ')
+      #   meas_arg = int(bpmclip_name_split[1])
+      #   beat_arg = int(bpmclip_name_split[2])
+      #   clyphx_length_arg = meas_arg*beat_arg/4 # CHOSE 4 BEATS PER BAR, MIGHT CHANGE IF I START PLAYING WITH TIME SIG
+      #   self.canonical_parent.show_message('length arg : %s' % clyphx_length_arg)
+      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) DEL' % (int(actiontrack_idx+1)))
+      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/ADDCLIP 1 %s' % (int(actiontrack_idx+1),clyphx_length_arg))
+      #   new_bpm_name = name_splitted[0] + ' ' + str(meas_arg) + ' ' + str(beat_arg)
+      #   bpm_clip.name = new_bpm_name
+
+
+    def qtzornot_loopers2(self, action_def, _): 
+        """switches between quantized or not quantized clips"""
+        tracks, idx_cmdloop_tracks = [self.initialize_variables()[i] for i in (0,16)]
+        clip_name = "" 
+        for i in range(len(idx_cmdloop_tracks)):
+            for j in range(4):
+                    idx_track = int(idx_cmdloop_tracks[i]) 
+                    clip_name = str(list(tracks[idx_track].clip_slots)[j].clip.name)
+                    self.canonical_parent.show_message('track %s, clip %s, name %s' % (int(idx_track+1),int(j+1),clip_name))
+
+                    if "QTZ" in clip_name and "OVD" not in clip_name:
+                        #  and "OVD" not in clip_name
+                          clip_name = clip_name.replace("/PLAYQ 1 BAR","/PLAY")
+                          clip_name = clip_name.replace("QTZ","")
+                          self.canonical_parent.show_message('%s' % clip_name)
+                          self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) NAME "%s"' % (int(idx_track+1),int(j+1),clip_name))
+                    elif "QTZ" not in clip_name and "OVD" not in clip_name:
+                          clip_name = clip_name.replace("/PLAY","/PLAYQ 1 BAR")
+                          clip_name = clip_name.replace("]","QTZ]")
+                          self.canonical_parent.show_message('%s' % clip_name)
+                          self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) NAME "%s"' % (int(idx_track+1),int(j+1),clip_name))
+                        #   self.canonical_parent.clyphx_pro_component.trigger_action_list('')
+            #   self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) NAME "%s"' % (int(idx_track+1),int(j+1),clip_name))
+            #   self.canonical_parent.show_message('%s' % clip_name)
+   
+
+    def duplicate_and_transpose(self, action_def, _): 
+        tracks, idx_recloop_track = [self.initialize_variables()[i] for i in (0,17)] 
+        self.canonical_parent.show_message('8 new beats pasted' )
+        for i in range(11):
+            self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP 1' % int(idx_recloop_track+1))
+            self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PASTECLIP %s' % (int(idx_recloop_track+1),int(i+2)))
+            self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(%s) SEMI %s' % (int(idx_recloop_track+1),int(i+2),int(i+1)))
+
+
     def new_beats_from_dump(self, action_def, _): 
         """copy beats, SC, and fills from DUMP group and pastes it to effective beatGroup"""
-        tracks, idx_beats_group, idx_dumpgroup = [self.initialize_variables()[i] for i in (0,12,18)]
+        tracks, idx_beats_group, idx_dumpgroup = [self.initialize_variables()[i] for i in (0,12,18)] 
         # --------- read Dump info clip to know which scenes to copy in the dump group ----------
         # ---------- CAREFULL: DUMP INFO CLIP MUST BE IN SAME TRACK AS THE CURRENT USER ACTION CLIP -----------
         track = action_def['track']   
@@ -289,8 +431,8 @@ class ExampleActions(UserActionsBase):
         idx_scenes_dump = [i+(dmpinfo_split_last-1)*8 for i in range(8)]
       #   self.canonical_parent.show_message('idx_scenes_dump : %s' % idx_scenes_dump)
         # --------- copy and paste clips from dump to effective beatgroup ---------
-        idx_copy = [idx_dumpgroup+1, idx_dumpgroup+2, idx_dumpgroup+3]
-        idx_paste = [idx_beats_group+1, idx_beats_group+2, idx_beats_group+3]
+        idx_copy = [idx_dumpgroup+1, idx_dumpgroup+2, idx_dumpgroup+3, idx_dumpgroup+4, idx_dumpgroup+5]
+        idx_paste = [idx_beats_group+1, idx_beats_group+2, idx_beats_group+3, idx_beats_group+4, idx_beats_group+5]
         for i in range(len(idx_copy)):
               for j in range(len(idx_scenes_dump)):
                     self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP %s' % (int(idx_copy[i]+1),int(idx_scenes_dump[j]+1)))
@@ -308,7 +450,7 @@ class ExampleActions(UserActionsBase):
         idx_instru_group = self.initialize_variables()[7]
         self.canonical_parent.show_message('coucou0')
 
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('all/ARM OFF')
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('all/ARM OFF ; "OUTPUTMASTER"/ARM ON')
         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "INSTRU" ; 1/OUT "Master" ; WAIT 5 ; 1/MON AUTO ; 1/ARM ON ; 1/MUTE ON')
         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/ARM ON' % int(idx_instru_group+2))
 
@@ -410,11 +552,11 @@ class ExampleActions(UserActionsBase):
               self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/CLIP(1) LOOP START 0' % int(idx+1))
               self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/CLIP(1) LOOP END %s' % (int(idx+1), new_length))
         self.canonical_parent.show_message('new meas/beat : %s/%s looplength : %s' % (meas_arg, beat_arg, float(beat_arg)*meas_arg))
-        bpm_clip = list(tracks[0].clip_slots)[-4].clip
-        init_bpm_name = bpm_clip.name
-        name_splitted = init_bpm_name.split(' ')
-        new_bpm_name = name_splitted[0] + ' ' + str(meas_arg) + ' ' + str(beat_arg)
-        bpm_clip.name = new_bpm_name
+      #   bpm_clip = list(tracks[0].clip_slots)[-4].clip
+      #   init_bpm_name = bpm_clip.name
+      #   name_splitted = init_bpm_name.split(' ')
+      #   new_bpm_name = name_splitted[0] + ' ' + str(meas_arg) + ' ' + str(beat_arg)
+      #   bpm_clip.name = new_bpm_name
 
 
 
@@ -681,7 +823,9 @@ class ExampleActions(UserActionsBase):
    
     def play_rec_clip(self, action_def, _):
         """play top clip of rec. conditions on muting looper tracks depending on the state of routing"""
+        self.canonical_parent.show_message('coucou00') 
         tracks, idx_loop_tracks, name_routing_clip = [self.initialize_variables()[i] for i in (0,1,6)]
+        self.canonical_parent.show_message('coucou') 
       #   name_muting_clip=list(tracks[0].clip_slots)[-2].clip.name
       #------------------- Conditions for Muting Loopers -------------
       # -------------- initial routing. Muting False -----------------
@@ -797,6 +941,12 @@ class ExampleActions(UserActionsBase):
               list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + list_bpm_arg[0] + ' ' + str(time_arg)
         else:
               self.canonical_parent.show_message('wrong argument, need 1 or 2' )   
+        bpm_clip = list(tracks[0].clip_slots)[-4].clip
+        init_bpm_name = bpm_clip.name
+        name_splitted = init_bpm_name.split(' ')
+        new_bpm_name = str(name_splitted[0]) + ' ' + str(meas_arg) + ' ' + str(time_arg)
+        bpm_clip.name = new_bpm_name
+
     
     def increase_bpm_from_loop_arg(self, action_def, args):
         """ increases by 1 the beat numbers of bpm_from_loop argument or the measures number. if args = 1, measure number, if args = 2, beat numbers """ 
@@ -830,6 +980,11 @@ class ExampleActions(UserActionsBase):
               list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + list_bpm_arg[0] + ' ' + str(time_arg)
         else:
               self.canonical_parent.show_message('wrong argument, need 1 or 2' )   
+        bpm_clip = list(tracks[0].clip_slots)[-4].clip
+        init_bpm_name = bpm_clip.name
+        name_splitted = init_bpm_name.split(' ')
+        new_bpm_name = str(name_splitted[0]) + ' ' + str(meas_arg) + ' ' + str(time_arg)
+        bpm_clip.name = new_bpm_name
     
 
     def delete_all_simpler_tracks(self, action_def, _):
