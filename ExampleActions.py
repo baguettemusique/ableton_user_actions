@@ -223,12 +223,13 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('reset_routing_new', self.reset_routing_new)
         self.add_track_action('new_beats_fromdump', self.new_beats_from_dump)
         self.add_global_action('duplicate_and_transpose', self.duplicate_and_transpose)
-        self.add_track_action('clip_from_BPMarg', self.create_clip_from_bpm_arg)
         self.add_track_action('tell_param_names', self.tell_param_names)
         self.add_track_action('activ_dlo', self.activate_DLo_buttons)
         self.add_global_action('switch_clear_undo', self.switch_DLobuttons_clear_undo)
         self.add_track_action('color_sel_looper', self.color_looper_cmd_track)
-
+        self.add_global_action('rec_sel_looper', self.rec_sel_looper)
+        self.add_track_action('clip_from_bpmarg', self.create_clip_from_bpm_arg)
+        self.add_global_action('ovd_allinst', self.ovd_allinst)
 
 
 
@@ -285,6 +286,46 @@ class ExampleActions(UserActionsBase):
 
         return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track, idx_dump_group
 # ----------- END OF INITIALIZING FUNCTION ---------------------
+
+    def ovd_allinst(self, action_def, _): 
+        """activates session record in order to record automation for all inst first clip. disables REC and OUTPUT monitoring while recording allInst, enables it afterwards"""
+        self.canonical_parent.show_message('coucou') 
+        self.canonical_parent.show_message('ovd_status : %s' % self.song().session_record) 
+        if self.song().session_record == False:
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('"REC","OUTPUTMASTER"/ARM OFF')
+              self.song().session_record = True
+        elif self.song().session_record == True:
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('reset_routing_new')
+              self.song().session_record = False
+        self.canonical_parent.show_message('ovd_status new : %s' % self.song().session_record) 
+      
+
+
+    def create_clip_from_bpm_arg(self, action_def, _): 
+        """launches first clip (rec) of the selected track if it is a looper track"""
+        all_tracks = self.initialize_variables()[0]
+        action_track = action_def['track']   
+        actiontrack_idx = list(self.song().tracks).index(action_def['track']) 
+        self.canonical_parent.show_message('action track idx : %s' % actiontrack_idx) 
+        bpm_clip = list(all_tracks[0].clip_slots)[-4].clip
+        bpmclip_name_split = bpm_clip.name.split(' ')
+        meas_arg = bpmclip_name_split[1]
+      #   beat_arg = int(bpmclip_name_split[2])
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) DEL' % (int(actiontrack_idx+1)))
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/ADDCLIP 1 %s' % (int(actiontrack_idx+1),meas_arg))
+        list(action_track.clip_slots)[0].clip.name = meas_arg + ' bars clip'
+        self.canonical_parent.show_message('meas : %s ' % meas_arg) 
+
+
+
+    def rec_sel_looper(self, action_def, _): 
+        """launches first clip (rec) of the selected track if it is a looper track""" 
+        sel_track, idx_sel_track = [self.initialize_variables()[i] for i in (9,10)]
+        if "Looper" in sel_track.name:
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PLAY 2' % int(idx_sel_track+1))
+        else:
+              self.canonical_parent.show_message('wrong track selected')
+
 
     def color_looper_cmd_track(self, action_def, args): 
         """colorizes in bright the command track corresponding to the selected looper""" 
@@ -362,23 +403,6 @@ class ExampleActions(UserActionsBase):
               text_names += ('P%s : %s / ' % (int(i+1), interest_device.parameters[i].name))
         self.canonical_parent.show_message(text_names)
       #   self.canonical_parent.show_message('%s' % interest_device.parameters[1].is_quantized)
-
-    def create_clip_from_bpm_arg(self, action_def, _): 
-        """creates clip with meas and beat arg from BPM clip in first track (position [-4])"""
-        self.canonical_parent.show_message('coucou')
-      #   all_tracks = self.initialize_variables()[0]
-      #   action_track = action_def['track']   
-      #   actiontrack_idx = list(self.song().tracks).index(action_def['track']) 
-      #   bpm_clip = list(all_tracks[0].clip_slots)[-4].clip
-      #   bpmclip_name_split = bpm_clip.name.split(' ')
-      #   meas_arg = int(bpmclip_name_split[1])
-      #   beat_arg = int(bpmclip_name_split[2])
-      #   clyphx_length_arg = meas_arg*beat_arg/4 # CHOSE 4 BEATS PER BAR, MIGHT CHANGE IF I START PLAYING WITH TIME SIG
-      #   self.canonical_parent.show_message('length arg : %s' % clyphx_length_arg)
-      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1) DEL' % (int(actiontrack_idx+1)))
-      #   self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/ADDCLIP 1 %s' % (int(actiontrack_idx+1),clyphx_length_arg))
-      #   new_bpm_name = name_splitted[0] + ' ' + str(meas_arg) + ' ' + str(beat_arg)
-      #   bpm_clip.name = new_bpm_name
 
 
     def qtzornot_loopers2(self, action_def, _): 
@@ -464,19 +488,29 @@ class ExampleActions(UserActionsBase):
               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP 10 ; %s/PASTECLIP 9 ; %s/COPYCLIP 1 ; %s/PASTECLIP 10 ; %s/COPYCLIP 9 ; %s/PASTECLIP 1' % (idx,idx,idx,idx,idx,idx))
    
 
-    def play_recloop(self, action_def, _): # A TESTER
+    def play_recloop(self, action_def, _): # A TESTER. NEED TO SET IT AS A CLIP ACTION
         """plays first recloop clip and stops loopers if it is the second time this function is used"""
-        tracks, idx_loop_tracks, idx_recloop_track = [self.initialize_variables()[i] for i in (0,1,17)]
+      #   clip = action_def['clip']
+        tracks, idx_loop_tracks, idx_recloop_track, idx_bpm_ctrl_track = [self.initialize_variables()[i] for i in (0,1,17,13)]
         recloop_track = tracks[idx_recloop_track]
         recloop_slots=list(recloop_track.clip_slots)
-      #   self.canonical_parent.show_message('coucou')
-
-        self.canonical_parent.show_message('idx loop tracks %s' % idx_loop_tracks)
-
+        idx_mpd_track = [i for i in range(len(tracks)) if "MPD" == tracks[i].name][0]
+        mpd_track = tracks[idx_mpd_track]
+        self.canonical_parent.show_message('mpd track %s' % mpd_track)
+        mpd_slots= list(mpd_track.clip_slots)
+        self.canonical_parent.show_message(' len mpd_slots %s' % len(mpd_slots))
+        idx_action_clip = [i for i in range(len(mpd_slots)) if mpd_slots[i].has_clip and "recloop_playSync" in mpd_slots[i].clip.name][0]
+        self.canonical_parent.show_message('idx_action_clip %s' % idx_action_clip)
+        init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
+        list_bpm_arg=init_clip_name.split(' ')
+        beat_arg=int(list_bpm_arg[-1])
+        meas_arg=int(list_bpm_arg[-2])
+        self.canonical_parent.show_message('beat arg %s' % beat_arg)
         if recloop_slots[0].has_clip:
                self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/PLAY 1 ; %s,%s,%s,%s/PLAY 5' % (int(idx_recloop_track+1),int(idx_loop_tracks[0]+1),int(idx_loop_tracks[1]+1),int(idx_loop_tracks[2]+1),int(idx_loop_tracks[3]+1)))
                self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/ARM OFF' % (int(idx_recloop_track+1)))     
         else:
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/CLIP(%s) LOOP END %s.1.1' % (int(idx_mpd_track+1),int(idx_action_clip+1),int(meas_arg+1)))
               self.canonical_parent.show_message('idx recloop track %s' % idx_recloop_track)
               self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/ARM ON ; %s/PLAY 1' % (int(idx_recloop_track+1),int(idx_recloop_track+1)))
 
