@@ -230,6 +230,9 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('rec_sel_looper', self.rec_sel_looper)
         self.add_track_action('clip_from_bpmarg', self.create_clip_from_bpm_arg)
         self.add_global_action('ovd_allinst', self.ovd_allinst)
+        self.add_global_action('play_all_loopers', self.play_all_loopers)
+        self.add_global_action('stop_all_loopers', self.stop_all_loopers)
+
 
 
 
@@ -261,8 +264,11 @@ class ExampleActions(UserActionsBase):
         idx_loop_tracks = [i for i in range(len(tracks)) if "Looper" in tracks[i].name]
         idx_loop_full = [i+1 for i in range(len(idx_loop_tracks)) if list(tracks[idx_loop_tracks[i]].clip_slots)[0].has_clip]
         nb_loop_tracks = len(idx_loop_tracks)
-        idx_measure_tracks = [i+nb_loop_tracks for i in idx_loop_tracks] # Assumption of measure tracks after loop tracks !! IT USED TO BE FOR ONLY FULL LOOPS; MIGHT HAVE PROBLEMS ONE DAY
-        idx_measure_tracks_full = [i+nb_loop_tracks for i in idx_loop_full]
+      #   ----- NO MEASURE TRACKS ANYMORE  --------- 
+        idx_measure_tracks = []
+        idx_measure_tracks_full = []
+      #   idx_measure_tracks = [i+nb_loop_tracks for i in idx_loop_tracks] # Assumption of measure tracks after loop tracks !! IT USED TO BE FOR ONLY FULL LOOPS; MIGHT HAVE PROBLEMS ONE DAY
+      #   idx_measure_tracks_full = [i+nb_loop_tracks for i in idx_loop_full]
         routing_clip_name = list(tracks[0].clip_slots)[-2].clip.name # !!!! ATTENTION l'indice de routing clip name peut changer !!!!
         idx_instru_group = [i for i in range(len(tracks)) if "INSTRU" in tracks[i].name][0] # ATTENTION le nom peut changer
         idx_beats_group = [i for i in range(len(tracks)) if "GrpBeet" in tracks[i].name] # ATTENTION le nom peut changer
@@ -287,6 +293,28 @@ class ExampleActions(UserActionsBase):
         return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track, idx_dump_group
 # ----------- END OF INITIALIZING FUNCTION ---------------------
 
+    def stop_all_loopers(self, action_def, _): 
+        """finds loopers idx and plays all (clip 5)"""
+        idx_loop_tracks = self.initialize_variables()[1]
+        str_idx = ''
+        for i in range(len(idx_loop_tracks)):
+              str_idx += str(int(idx_loop_tracks[i]+1))
+              if i < len(idx_loop_tracks)-1:
+                    str_idx += ','
+        self.canonical_parent.show_message('str : %s' % str_idx) 
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PLAY 5' % (str_idx))
+         
+    def play_all_loopers(self, action_def, _): 
+        """finds loopers idx and plays all (clip 3)"""
+        idx_loop_tracks = self.initialize_variables()[1]
+        str_idx = ''
+        for i in range(len(idx_loop_tracks)):
+              str_idx += str(int(idx_loop_tracks[i]+1))
+              if i < len(idx_loop_tracks)-1:
+                    str_idx += ','
+        self.canonical_parent.show_message('str : %s' % str_idx) 
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/PLAY 3' % (str_idx))
+         
     def ovd_allinst(self, action_def, _): 
         """activates session record in order to record automation for all inst first clip. disables REC and OUTPUT monitoring while recording allInst, enables it afterwards"""
         self.canonical_parent.show_message('coucou') 
@@ -345,22 +373,39 @@ class ExampleActions(UserActionsBase):
 
 
     def switch_DLobuttons_clear_undo(self, action_def, _): 
-        """activates clear, clear_all, undo, or undo_all buttons from DLo Max Device""" # MARCHE SI DLO CLIPS IN LP1 AND LP2 TRACKS
+        """activates clear, clear_all, undo, or undo_all buttons from DLo Max Device. plus 3d mode to use x2 and :2 functions of looper""" # MARCHE SI DLO CLIPS IN LP1 AND LP2 TRACKS
         self.canonical_parent.show_message('coucou3')
-      #   tracks, idx_cmdloop_tracks = [self.initialize_variables()[i] for i in (0,16)]
         tracks=list(self.song().tracks)
         idx_LP_tracks=[i for i in range(len(tracks)) if "LP" in tracks[i].name]
         for i in (0,1):
               LPtrack = tracks[idx_LP_tracks[i]]
               LPslots = list(LPtrack.clip_slots)
               self.canonical_parent.show_message('len LPslots %s' % len(LPslots))
-              idx_dloclips = [j for j in range(len(LPslots)) if LPslots[j].has_clip and bool("[clear" in LPslots[j].clip.name or "[undo" in LPslots[j].clip.name)][0]
+              idx_dloclips = [j for j in range(len(LPslots)) if LPslots[j].has_clip and bool("[clear" in LPslots[j].clip.name or "[undo" in LPslots[j].clip.name or "[x2" in LPslots[j].clip.name or "[:2" in LPslots[j].clip.name)][0]
               self.canonical_parent.show_message('iddx dlos %s' % idx_dloclips)
-              if "clear" in LPslots[idx_dloclips].clip.name:
+              string_inbrackets = (LPslots[idx_dloclips].clip.name.split("[")[1]).split("]")[0]
+              self.canonical_parent.show_message('string brackets %s' % string_inbrackets)
+
+              if "[clear" in LPslots[idx_dloclips].clip.name:
                     LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace("clear","undo")
                     self.canonical_parent.clyphx_pro_component.trigger_action_list('"LP1","LP2"/CLIP(%s) COLOR 40' % int(idx_dloclips+1))
-              elif "undo" in LPslots[idx_dloclips].clip.name:
-                    LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace("undo","clear")
+              elif "[undo" in LPslots[idx_dloclips].clip.name:
+                    LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace("LP1","LP2")
+                    if i == 0:
+                          LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace(string_inbrackets,":2",1)
+                          LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace(string_inbrackets,"clear")
+                    elif i == 1:
+                          LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace(string_inbrackets,"x2",1)
+                          LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace(string_inbrackets,"undo")
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('"LP1","LP2"/CLIP(%s) COLOR 20' % int(idx_dloclips+1))
+              elif "[x2" in LPslots[idx_dloclips].clip.name or "[:2" in LPslots[idx_dloclips].clip.name:
+                    if i == 0:
+                          LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace(string_inbrackets,"clear")
+                          LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace("undo","clear")
+                    elif i == 1:
+                          LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace(string_inbrackets,"clear_all")
+                          LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace("undo","clear_all")
+                    LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace("LP2","LP1")
                     self.canonical_parent.clyphx_pro_component.trigger_action_list('"LP1","LP2"/CLIP(%s) COLOR 2' % int(idx_dloclips+1))
 
     def activate_DLo_buttons(self, action_def, args): 
