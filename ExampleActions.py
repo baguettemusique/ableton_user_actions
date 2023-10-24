@@ -368,8 +368,6 @@ class ExampleActions(UserActionsBase):
         if "LP" in action_track.name and len(args) == 0:
               self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/CLIP(1-4) COLOR 32' % int(actiontrack_idx+1))
               self.canonical_parent.show_message('coucoucoucou')
-       
-
 
 
     def switch_DLobuttons_clear_undo(self, action_def, _): 
@@ -385,7 +383,6 @@ class ExampleActions(UserActionsBase):
               self.canonical_parent.show_message('iddx dlos %s' % idx_dloclips)
               string_inbrackets = (LPslots[idx_dloclips].clip.name.split("[")[1]).split("]")[0]
               self.canonical_parent.show_message('string brackets %s' % string_inbrackets)
-
               if "[clear" in LPslots[idx_dloclips].clip.name:
                     LPslots[idx_dloclips].clip.name = LPslots[idx_dloclips].clip.name.replace("clear","undo")
                     self.canonical_parent.clyphx_pro_component.trigger_action_list('"LP1","LP2"/CLIP(%s) COLOR 40' % int(idx_dloclips+1))
@@ -437,7 +434,7 @@ class ExampleActions(UserActionsBase):
 
 
     def tell_param_names(self, action_def, args): 
-        """creates clip with meas and beat arg from BPM clip in first track (position [-4])"""
+        """bla"""
         action_track = action_def['track']
         actiontrack_idx = list(self.song().tracks).index(action_def['track']) 
         devices = list(action_track.devices)
@@ -537,6 +534,7 @@ class ExampleActions(UserActionsBase):
         """plays first recloop clip and stops loopers if it is the second time this function is used"""
       #   clip = action_def['clip']
         tracks, idx_loop_tracks, idx_recloop_track, idx_bpm_ctrl_track = [self.initialize_variables()[i] for i in (0,1,17,13)]
+        str_loopertracks_idx=str([i+1 for i in idx_loop_tracks])[1:-1]
         recloop_track = tracks[idx_recloop_track]
         recloop_slots=list(recloop_track.clip_slots)
         idx_mpd_track = [i for i in range(len(tracks)) if "MPD" == tracks[i].name][0]
@@ -552,7 +550,7 @@ class ExampleActions(UserActionsBase):
         meas_arg=int(list_bpm_arg[-2])
         self.canonical_parent.show_message('beat arg %s' % beat_arg)
         if recloop_slots[0].has_clip:
-               self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/PLAY 1 ; %s,%s,%s,%s/PLAY 5' % (int(idx_recloop_track+1),int(idx_loop_tracks[0]+1),int(idx_loop_tracks[1]+1),int(idx_loop_tracks[2]+1),int(idx_loop_tracks[3]+1)))
+               self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/PLAY 1 ; %s/PLAY 5' % (int(idx_recloop_track+1),str_loopertracks_idx))
                self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/ARM OFF' % (int(idx_recloop_track+1)))     
         else:
               self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/CLIP(%s) LOOP END %s.1.1' % (int(idx_mpd_track+1),int(idx_action_clip+1),int(meas_arg+1)))
@@ -588,27 +586,66 @@ class ExampleActions(UserActionsBase):
        
         
 
-    def adjust_length_loopclips_new(self, action_def, _): # A TESTER
+    def adjust_length_loopclips_new(self, action_def, args): # A TESTER
         """chooses the right rec clip with the right automation looper enveloppe"""
-        tracks, idx_bpm_ctrl_track = [self.initialize_variables()[i] for i in (0,13)]
-        idx_loop_tracks = [1,2,3,4] # EN DUR ATTENTION
+        tracks, idx_loop_tracks, idx_bpm_ctrl_track = [self.initialize_variables()[i] for i in (0,1,13)]
+      #   idx_loop_tracks = [1,2,3,4] # EN DUR ATTENTION
         init_clip_name = list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name
         list_bpm_arg=init_clip_name.split(' ')
         beat_arg=list_bpm_arg[-1]
         meas_arg=list_bpm_arg[-2]
-        self.canonical_parent.show_message('beat arg %s' % beat_arg)
-        
+        total_beats_asked = str(int(beat_arg)*int(meas_arg))
+        all_clip_names = []
+        all_names_dico={}
+        good_name_1 = "rec " + meas_arg + " " + beat_arg
+        good_name_2 = "rec " + total_beats_asked + " beats"
+        good_track_idx = 0
+        good_slot_idx = 0
+        str_loopertracks_idx=str([i+1 for i in idx_loop_tracks])[1:-1]
         for i in range(len(idx_loop_tracks)):
             # --- read and find got rec name ---
               idx = idx_loop_tracks[i]
               track_loop = tracks[idx]
               clipslots = list(track_loop.clip_slots)
             #   self.canonical_parent.show_message('coucou')
-
-              idx_goodslot = [i for i in range(len(clipslots)) if clipslots[i].has_clip and clipslots[i].clip.name == "rec " + meas_arg + " " + beat_arg][0]
-              self.canonical_parent.show_message('idx goodslot %s' % idx_goodslot)
+            #   self.canonical_parent.show_message('goodname2 %s' % good_name_2)
+            #   idx_goodslot = [i for i in range(len(clipslots)) if clipslots[i].has_clip and bool(clipslots[i].clip.name == good_name_1 or clipslots[i].clip.name == good_name_2)][0]
+            #   self.canonical_parent.show_message('idx goodslot %s' % idx_goodslot)
               # --- paste clip in right place ---
-              self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/COPYCLIP %s ; %s/PASTECLIP 2' % (int(idx+1),int(idx_goodslot+1),int(idx+1)))
+            #   self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/COPYCLIP %s ; %s/PASTECLIP 2' % (int(idx+1),int(idx_goodslot+1),int(idx+1)))
+              for slot_idx in list(range(len(clipslots)))[5:]: #we use only clipslots below the 6th row
+                    if clipslots[slot_idx].has_clip:
+                          all_clip_names.append(clipslots[slot_idx].clip.name)
+                          all_names_dico.update({(idx,slot_idx):clipslots[slot_idx].clip.name})
+      #   idx_goodslotagain = [i for i in range(len(all_clip_names)) if all_clip_names[i] == good_name_1 or all_clip_names[i] == good_name_2][0]
+        for position, name in all_names_dico.items():  # for name, age in dictionary.iteritems():  (for Python 2.x)
+              if name == good_name_2:
+                    good_track_idx,good_slot_idx=position
+        if args == '1':
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/COPYCLIP %s ; %s/PASTECLIP 2' % (int(good_track_idx+1),int(good_slot_idx+1),str_loopertracks_idx))
+        elif args == '2':
+              self.canonical_parent.show_message('args 2, goodtrack %s,goodslot %s ' % (good_track_idx,good_slot_idx))
+              for idx in idx_loop_tracks:
+                    self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/COPYCLIP %s ; %s/PASTECLIP 2' % (int(idx+1),int(good_slot_idx+1),int(idx+1))) 
+      #   self.canonical_parent.show_message('total beat asked %s' % total_beats_asked)
+      #   self.canonical_parent.show_message('(all_clip_names) %s' % (all_clip_names))
+      #   self.canonical_parent.show_message('goodnames %s,%s idx goodslotagain %s' % (good_name_1,good_name_2,idx_goodslotagain))
+      #   self.canonical_parent.show_message('(dico) %s' % (all_names_dico))
+      #   self.canonical_parent.show_message('goodtrack %s,goodslot %s ' % (good_track_idx,good_slot_idx))
+
+     
+      #   for i in range(len(idx_loop_tracks)):
+      #         idx = idx_loop_tracks[i]
+      #         track_loop = tracks[idx]
+      #         clipslots = list(track_loop.clip_slots)
+      #         for slot_idx in range(len(clipslots)):
+      #               if slot.has_clip and slot.clip.name == all_clip_names[idx_goodslotagain]:
+      #                     good_track_idx = idx
+      #                     good_slot_idx = slot_idx
+      #   self.canonical_parent.show_message('(goodtrack %s goodslot %s) ' % (good_track_idx,good_slot_idx))
+
+      #   if good_track_idx != 0 and good_slot_idx != 0:
+      #         self.canonical_parent.show_message('(goodtrack %s goodslot %s) ' % (good_track_idx,good_slot_idx))
               
 
 
