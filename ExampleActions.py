@@ -232,6 +232,7 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('ovd_allinst', self.ovd_allinst)
         self.add_global_action('play_all_loopers', self.play_all_loopers)
         self.add_global_action('stop_all_loopers', self.stop_all_loopers)
+        self.add_track_action('adjust_loopersrec', self.adjust_loopersrec_ABC)
 
 
 
@@ -269,7 +270,8 @@ class ExampleActions(UserActionsBase):
         idx_measure_tracks_full = []
       #   idx_measure_tracks = [i+nb_loop_tracks for i in idx_loop_tracks] # Assumption of measure tracks after loop tracks !! IT USED TO BE FOR ONLY FULL LOOPS; MIGHT HAVE PROBLEMS ONE DAY
       #   idx_measure_tracks_full = [i+nb_loop_tracks for i in idx_loop_full]
-        routing_clip_name = list(tracks[0].clip_slots)[-2].clip.name # !!!! ATTENTION l'indice de routing clip name peut changer !!!!
+        routing_clip_name = [slot for slot in list(tracks[0].clip_slots) if slot.has_clip and "routing" in slot.clip.name][0].clip.name
+      #   routing_clip_name = list(tracks[0].clip_slots)[-4].clip.name # !!!! ATTENTION l'indice de routing clip name peut changer !!!!
         idx_instru_group = [i for i in range(len(tracks)) if "INSTRU" in tracks[i].name][0] # ATTENTION le nom peut changer
         idx_beats_group = [i for i in range(len(tracks)) if "GrpBeet" in tracks[i].name] # ATTENTION le nom peut changer
         if len(idx_beats_group) > 0:
@@ -292,6 +294,22 @@ class ExampleActions(UserActionsBase):
 
         return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track, idx_dump_group
 # ----------- END OF INITIALIZING FUNCTION ---------------------
+    
+
+    def adjust_loopersrec_ABC(self, action_def, args): # A TESTER
+        """pastes right rec clip for rec scenes 8-15 in looper tracks"""
+        self.canonical_parent.show_message('pouet00') 
+        tracks, idx_loop_tracks, idx_bpm_ctrl_track = [self.initialize_variables()[i] for i in (0,1,13)]
+        self.canonical_parent.show_message('pouet0') 
+        action_track = action_def['track']   
+        actiontrack_idx = list(self.song().tracks).index(action_def['track']) 
+        self.canonical_parent.show_message('beats + args : %s' % str("beats "+args)) 
+        goodslots_idx = [idx for idx in range(len(list(action_track.clip_slots))) if list(action_track.clip_slots)[idx].has_clip and args.upper() == list(action_track.clip_slots)[idx].clip.name.split(' ')[-1] and idx > 20] # condition idx > 20 to be sure we dont count the active rec buttons
+        self.canonical_parent.show_message('args : .%s. goodslots %s' % (args,goodslots_idx))
+      #   self.canonical_parent.show_message('sc 25 last word %s' % list(action_track.clip_slots)[25].clip.name.split(' ')) 
+        for i in range(len(goodslots_idx)):
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP %s ; %s/PASTECLIP %s' % (int(actiontrack_idx+1), int(goodslots_idx[i]+1), int(actiontrack_idx+1), int(i+8))) # rec clips start at scene 8
+
 
     def stop_all_loopers(self, action_def, _): 
         """finds loopers idx and plays all (clip 5)"""
@@ -516,7 +534,7 @@ class ExampleActions(UserActionsBase):
         idx_instru_group = self.initialize_variables()[7]
         self.canonical_parent.show_message('coucou0')
 
-        self.canonical_parent.clyphx_pro_component.trigger_action_list('all/ARM OFF ; "OUTPUTMASTER"/ARM ON')
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('all/ARM OFF ; "OUTPUTMASTER","VOIX"/ARM ON')
         self.canonical_parent.clyphx_pro_component.trigger_action_list('1/IN "INSTRU" ; 1/OUT "Master" ; WAIT 5 ; 1/MON AUTO ; 1/ARM ON ; 1/MUTE ON')
         self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/ARM ON' % int(idx_instru_group+2))
 
@@ -619,7 +637,7 @@ class ExampleActions(UserActionsBase):
                           all_names_dico.update({(idx,slot_idx):clipslots[slot_idx].clip.name})
       #   idx_goodslotagain = [i for i in range(len(all_clip_names)) if all_clip_names[i] == good_name_1 or all_clip_names[i] == good_name_2][0]
         for position, name in all_names_dico.items():  # for name, age in dictionary.iteritems():  (for Python 2.x)
-              if name == good_name_2:
+              if good_name_2 in name:
                     good_track_idx,good_slot_idx=position
         if args == '1':
               self.canonical_parent.clyphx_pro_component.trigger_action_list('[] %s/COPYCLIP %s ; %s/PASTECLIP 2' % (int(good_track_idx+1),int(good_slot_idx+1),str_loopertracks_idx))
@@ -941,7 +959,7 @@ class ExampleActions(UserActionsBase):
         """play top clip of rec. conditions on muting looper tracks depending on the state of routing"""
         self.canonical_parent.show_message('coucou00') 
         tracks, idx_loop_tracks, name_routing_clip = [self.initialize_variables()[i] for i in (0,1,6)]
-        self.canonical_parent.show_message('coucou') 
+        self.canonical_parent.show_message('name routing : %s' % name_routing_clip) 
       #   name_muting_clip=list(tracks[0].clip_slots)[-2].clip.name
       #------------------- Conditions for Muting Loopers -------------
       # -------------- initial routing. Muting False -----------------
@@ -1057,7 +1075,7 @@ class ExampleActions(UserActionsBase):
               list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + list_bpm_arg[0] + ' ' + str(time_arg)
         else:
               self.canonical_parent.show_message('wrong argument, need 1 or 2' )   
-        bpm_clip = list(tracks[0].clip_slots)[-4].clip
+        bpm_clip = [slot for slot in list(tracks[0].clip_slots) if slot.has_clip and "BPM" in slot.clip.name][0].clip
         init_bpm_name = bpm_clip.name
         name_splitted = init_bpm_name.split(' ')
         new_bpm_name = str(name_splitted[0]) + ' ' + str(meas_arg) + ' ' + str(time_arg)
@@ -1096,7 +1114,7 @@ class ExampleActions(UserActionsBase):
               list(tracks[idx_bpm_ctrl_track].clip_slots)[7].clip.name = base_name + list_bpm_arg[0] + ' ' + str(time_arg)
         else:
               self.canonical_parent.show_message('wrong argument, need 1 or 2' )   
-        bpm_clip = list(tracks[0].clip_slots)[-4].clip
+        bpm_clip = [slot for slot in list(tracks[0].clip_slots) if slot.has_clip and "BPM" in slot.clip.name][0].clip
         init_bpm_name = bpm_clip.name
         name_splitted = init_bpm_name.split(' ')
         new_bpm_name = str(name_splitted[0]) + ' ' + str(meas_arg) + ' ' + str(time_arg)
