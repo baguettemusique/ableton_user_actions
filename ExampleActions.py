@@ -233,6 +233,8 @@ class ExampleActions(UserActionsBase):
         self.add_global_action('play_all_loopers', self.play_all_loopers)
         self.add_global_action('stop_all_loopers', self.stop_all_loopers)
         self.add_track_action('adjust_loopersrec', self.adjust_loopersrec_ABC)
+        self.add_global_action('qtz_unqtz_loopers', self.quantize_or_not_loopers)
+        self.add_global_action('qtz_global', self.set_global_quantization)
 
 
 
@@ -294,7 +296,45 @@ class ExampleActions(UserActionsBase):
 
         return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track, idx_dump_group
 # ----------- END OF INITIALIZING FUNCTION ---------------------
-    
+     
+    def set_global_quantization(self, action_def, args): # A TESTER
+      self.song().clip_trigger_quantization = int(args)
+      self.canonical_parent.show_message('global qtz : %s' % self.song().clip_trigger_quantization)  
+
+    def quantize_or_not_loopers(self, action_def, args): # A TESTER
+        """quantizes or unquantizes looper devices in all chains of all looper tracks Note : qtz is loopers 7th parameter (so 6th index here)"""
+        tracks, idx_loop_tracks = [self.initialize_variables()[i] for i in (0,1)]
+        args_split = args.split(' ')
+        nb_beats_qtz = int(args_split[0])
+        possible_args = [1,2,4]
+        possible_looper_qtz_idx = [8,6,5]
+        for idx in idx_loop_tracks:
+              chains = list(list(tracks[idx].devices)[0].chains)
+              parameters = list(list(chains[0].devices)[0].parameters)
+              value_1bar = 5
+              value_none = 1
+              self.canonical_parent.show_message('chains : %s' % chains) 
+              param_names = []
+              if len(args_split) == 1:
+                    if parameters[6].value == value_none:
+                          if args in possible_args:
+                                looper_qtz_idx = [i for i in possible_args if possible_args[i] == args] # DOESN WORK FOR NOW
+                                parameters[6].value = possible_looper_qtz_idx[looper_qtz_idx]
+                          else:
+                                parameters[6].value = value_1bar
+                    elif parameters[6].value != value_none:
+                          parameters[6].value = value_none
+              elif len(args_split) == 2:
+                    if args_split[1] == 'on':
+                          parameters[6].value = value_1bar
+                    elif args_split[1] == 'off':
+                          parameters[6].value = value_none
+                    else:
+                          self.canonical_parent.show_message('error, only on or off accepted as second arg') 
+              qtz_state = parameters[6].value
+              self.canonical_parent.show_message('params : %s' % param_names) 
+              self.canonical_parent.show_message('qtz : %s' % qtz_state) 
+            #   self.canonical_parent.show_message('len args split : %s' % len(args_split)) 
 
     def adjust_loopersrec_ABC(self, action_def, args): # A TESTER
         """pastes right rec clip for rec scenes 8-15 in looper tracks"""
