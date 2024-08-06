@@ -235,6 +235,10 @@ class ExampleActions(UserActionsBase):
         self.add_track_action('adjust_loopersrec', self.adjust_loopersrec_ABC)
         self.add_global_action('qtz_unqtz_loopers', self.quantize_or_not_loopers)
         self.add_global_action('qtz_global', self.set_global_quantization)
+      #   self.add_track_action('rec_ABC_loopers', self.rec_ABC_loopers)
+        self.add_track_action('rec_abc_loopers', self.rec_abc_loopers)
+        self.add_global_action('select_instru', self.select_instrument)
+        self.add_track_action('switch_abc', self.switch_abc)
 
 
 
@@ -262,6 +266,7 @@ class ExampleActions(UserActionsBase):
         16 : idx_cmdloop_tracks
         17 : idx_recloop_track
         18 : idx_dump_group
+        19 : instru_names
         """
         tracks=list(self.song().tracks)
         idx_loop_tracks = [i for i in range(len(tracks)) if "Looper" in tracks[i].name]
@@ -293,10 +298,160 @@ class ExampleActions(UserActionsBase):
         idx_dump_group=[i for i in range(len(tracks)) if "DUMP" in tracks[i].name]
         if len(idx_dump_group) > 0:
               idx_dump_group = idx_dump_group[0]
+        instru_names = ["KEYS","BASS","DRUMS","KICKS","SNARES","HATS","PERCS","Fills","Shakers"]
 
-        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track, idx_dump_group
+        return tracks, idx_loop_tracks, idx_loop_full, nb_loop_tracks, idx_measure_tracks, idx_measure_tracks_full, routing_clip_name, idx_instru_group, idx_instru_tracks, sel_track, idx_sel_track, idx_loops_out_track, idx_beats_group, idx_bpm_ctrl_track, live_sample_frames, names_beats_midi, idx_cmdloop_tracks, idx_recloop_track, idx_dump_group, instru_names
 # ----------- END OF INITIALIZING FUNCTION ---------------------
-     
+
+
+# [] "all_Inst"/SEL ; "all_Inst"/ARM ON; color_sel_looper 0 ; "bass","druminst","VOIX","RECLOOP"/ARM OFF ; BIND ROLL_1 "all_Inst"/DEV(1) B1 P1 ; "VoxKey"/MON OFF ; BIND ROLL_1 "all_Inst"/DEV(1) B1 P1
+
+
+    def switch_abc(self, action_def, args): 
+        self.canonical_parent.show_message('coucou' ) 
+        tracks, idx_loop_tracks = [self.initialize_variables()[i] for i in (0,1)] 
+        track = action_def['track']
+        actiontrack_idx = tracks.index(track) 
+        self.canonical_parent.show_message('track : %s' % actiontrack_idx ) 
+        args_list = ['a','b','c']
+        copyclips_list = [8,11,14] # idx of the possible first clip to be copied, depending on arg --- !!!! CAN BE CHANGED !!!! ---
+        idx_copyclip = copyclips_list[args_list.index(args)] # effective idx of the first clip to be copied
+      #   self.canonical_parent.show_message('idx copyclip : %s' % type(idx_copyclip) ) 
+      #   for i in range(len(idx_loop_tracks)):
+      #       self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP %s ; %s/PASTECLIP 3' % (int(idx_loop_tracks[i]+1),int(idx_copyclip),int(idx_loop_tracks[i]+1)))
+      #       self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP %s ; %s/PASTECLIP 4' % (int(idx_loop_tracks[i]+1),int(idx_copyclip+1),int(idx_loop_tracks[i]+1)))
+      #       self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP %s ; %s/PASTECLIP 5' % (int(idx_loop_tracks[i]+1),int(idx_copyclip+2),int(idx_loop_tracks[i]+1)))
+       
+        # check what the current active looper is   -------------------------- !!!!! CLIP NAMES MIGHT CHANGE !!!!! -----------
+        former_rec_clip_name = list(track.clip_slots)[2].clip.name # ---------- !!!! Might Change !!!!
+        self.canonical_parent.show_message('rec clip: %s' % former_rec_clip_name ) 
+        former_active_looper = ''
+        if 'recABC' in former_rec_clip_name:
+              former_active_looper = 'A'
+        elif 'recBC' in former_rec_clip_name:
+              former_active_looper = 'B'
+        elif 'recC' in former_rec_clip_name:
+              former_active_looper = 'C'
+        self.canonical_parent.show_message('former active looper: %s' % former_active_looper ) 
+        # Look for the clips to copy paste and copy paste them 
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP %s ; %s/PASTECLIP 3' % (int(actiontrack_idx+1),int(idx_copyclip),int(actiontrack_idx+1)))
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP %s ; %s/PASTECLIP 4' % (int(actiontrack_idx+1),int(idx_copyclip+1),int(actiontrack_idx+1)))
+        self.canonical_parent.clyphx_pro_component.trigger_action_list('%s/COPYCLIP %s ; %s/PASTECLIP 5' % (int(actiontrack_idx+1),int(idx_copyclip+2),int(actiontrack_idx+1)))
+        # According to current state of looper, switch to new ABC looper with automation ==> Check if all loopers ABC are stopped, and if not, an action will be made. 
+        # state parameter values : 0 stop, 1 rec, 2 play, 3 ovd
+        ABC_loopers = list(list(track.devices)[0].chains)
+        self.canonical_parent.show_message('ABClooper: %s' % ABC_loopers ) 
+      #   A_looper_state = []
+      #   for i in range(len(list(list(ABC_loopers[0].devices)[0].parameters))):
+      #         A_looper_state.append(list(list(ABC_loopers[0].devices)[0].parameters)[i].name)
+        A_looper_state = list(list(ABC_loopers[0].devices)[0].parameters)[1].value # 0 stop, 1 rec, 2 play, 3 ovd
+        self.canonical_parent.show_message('A state : %s' % A_looper_state ) 
+        ABC_loopers_states = []
+        for i in range(len(ABC_loopers)):
+              ABC_loopers_states.append(list(list(ABC_loopers[i].devices)[0].parameters)[1].value)
+        self.canonical_parent.show_message('ABC states : %s' % ABC_loopers_states) 
+        if any(ABC_loopers_states) != 0: # we check that the looper is not stopped, so that at least one ABC value is different than 0
+              self.canonical_parent.show_message('looper not fully stopped') 
+              # Lots of conditions for each case
+              if former_active_looper == 'A' and args == 'b':
+                    list(list(ABC_loopers[0].devices)[0].parameters)[1].value = 0
+                    list(list(ABC_loopers[1].devices)[0].parameters)[1].value = 2
+                    list(list(ABC_loopers[2].devices)[0].parameters)[1].value = 0
+              elif former_active_looper == 'A' and args == 'c':
+                    list(list(ABC_loopers[0].devices)[0].parameters)[1].value = 0
+                    list(list(ABC_loopers[1].devices)[0].parameters)[1].value = 0
+                    list(list(ABC_loopers[2].devices)[0].parameters)[1].value = 2
+              elif former_active_looper == 'B' and args == 'a':
+                    list(list(ABC_loopers[0].devices)[0].parameters)[1].value = 2
+                    list(list(ABC_loopers[1].devices)[0].parameters)[1].value = 0
+                    list(list(ABC_loopers[2].devices)[0].parameters)[1].value = 0
+              elif former_active_looper == 'B' and args == 'c':
+                    list(list(ABC_loopers[0].devices)[0].parameters)[1].value = 0
+                    list(list(ABC_loopers[1].devices)[0].parameters)[1].value = 0
+                    list(list(ABC_loopers[2].devices)[0].parameters)[1].value = 2
+              elif former_active_looper == 'C' and args == 'a':
+                    list(list(ABC_loopers[0].devices)[0].parameters)[1].value = 2
+                    list(list(ABC_loopers[1].devices)[0].parameters)[1].value = 0
+                    list(list(ABC_loopers[2].devices)[0].parameters)[1].value = 0
+              elif former_active_looper == 'C' and args == 'b':
+                    list(list(ABC_loopers[0].devices)[0].parameters)[1].value = 0
+                    list(list(ABC_loopers[1].devices)[0].parameters)[1].value = 2
+                    list(list(ABC_loopers[2].devices)[0].parameters)[1].value = 0
+        
+
+
+
+    def select_instrument(self, action_def, args): # should add the bind ROLL_1 function ??
+        """ sets the routing for a newly selected instrument track """
+        tracks, instru_names = [self.initialize_variables()[i] for i in (0,19)]
+        self.canonical_parent.show_message('coucou2') 
+        self.canonical_parent.show_message('track names 0 : %s' % type(tracks[0].name)) 
+        idx_instru_tracks=[]
+        for j in range(len(instru_names)):
+              idx = [i for i in range(len(tracks)) if instru_names[j] in tracks[i].name]
+              idx_instru_tracks.append(idx)
+        self.canonical_parent.show_message('idx instru : %s' % idx_instru_tracks ) 
+        sel_inst = args
+        idx_sel_inst = [i for i in range(len(tracks)) if sel_inst.lower() == tracks[i].name.lower()][0]
+        idx_sel_inst_txt = str(idx_sel_inst+1)
+        self.canonical_parent.show_message('%s' % idx_sel_inst_txt) 
+        idx_other_inst = [i for i in range(len(tracks)) if sel_inst.lower() != tracks[i].name.lower() and tracks[i].name in instru_names ]
+        self.canonical_parent.show_message('other inst %s' % idx_other_inst) 
+        idx_other_inst_txt = ''
+        for i in range(len(idx_other_inst)):
+              idx_other_inst_txt += str(idx_other_inst[i]+1) + ','
+        idx_other_inst_txt = idx_other_inst_txt[:-1]
+        self.canonical_parent.show_message('other inst txt %s' % idx_other_inst_txt) 
+        self.canonical_parent.clyphx_pro_component.trigger_action_list(idx_sel_inst_txt+'/SEL;'+idx_sel_inst_txt+'/ARM ON; color_sel_looper 0;'+idx_other_inst_txt+'/ARM OFF')
+        if args.lower() == "inputMidi".lower():
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('"VoxKey"/MON IN')
+        else:
+              self.canonical_parent.clyphx_pro_component.trigger_action_list('"VoxKey"/MON OFF')
+        self.canonical_parent.show_message('yheeee') 
+
+
+
+#     def rec_ABC_loopers(self, action_def, _): # A TESTER
+#         self.canonical_parent.show_message('coucou') 
+      #   all_tracks = self.initialize_variables()[0]
+      #   action_track = action_def['track']   
+      #   actiontrack_idx = list(self.song().tracks).index(action_def['track']) 
+      #   chains = list(list(action_track.devices)[0].chains)
+      #   self.canonical_parent.show_message('chains : %s' % chains) 
+
+    def rec_abc_loopers(self, action_def, args):
+        """ changes the looper rack chain for A, B or C """
+        self.canonical_parent.show_message('coucou2') 
+        track = action_def['track']
+        master = self.song().master_track
+        if not args or 'vol' in args:
+            track.mixer_device.volume.value = master.mixer_device.volume.value
+        if not args or 'pan' in args:
+            track.mixer_device.panning.value = master.mixer_device.panning.value
+        all_tracks = self.initialize_variables()[0]
+        action_track = action_def['track']   
+        actiontrack_idx = list(self.song().tracks).index(action_def['track']) 
+        if 'A' in args or not args:
+                    chains = list(list(action_track.devices)[0].chains)
+        elif 'B' in args:
+                    chains = list(list(action_track.devices)[0].chains)[1:] #marche pas
+        elif 'C' in args:
+                    chains = list(list(action_track.devices)[0].chains)[2:] #marche pas
+      #   chains = list(list(action_track.devices)[0].chains)
+        self.canonical_parent.show_message('chains : %s' % chains)  
+        for i in range(len(chains)):
+              params = list(list(chains[i].devices)[0].parameters)
+              params_names=[param.name for param in params]
+              state = [param for param in params if "State" in param.name][0]
+              if state.value == 1:
+                   state.value = 2 #play if already recording
+              else:
+                    state.value = 1
+        self.canonical_parent.show_message('state value : %s' % state.value)  
+
+      
+      
+
     def set_global_quantization(self, action_def, args): # A TESTER
       self.song().clip_trigger_quantization = int(args)
       self.canonical_parent.show_message('global qtz : %s' % self.song().clip_trigger_quantization)  
@@ -1391,6 +1546,7 @@ class ExampleActions(UserActionsBase):
     def track_action_example(self, action_def, args):
         """ Sets the volume and/or panning of the track to be the same as the master
         track.  This obviously does nothing if the track is the master track. """
+        self.canonical_parent.show_message('coucou') 
         track = action_def['track']
         master = self.song().master_track
         if not args or 'vol' in args:
